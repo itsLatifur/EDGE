@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Answer of Question No. 2</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: bisque;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        div {
+            width: 80%;
+            max-width: 900px;
+            background-color: antiquewhite;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        thead {
+            background-color: black;
+            color: cyan;
+        }
+
+        th {
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        tbody tr {
+            background-color: bisque;
+            transition: background-color 0.3s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #98f1f1;
+            transform: scale(1.015);
+        }
+
+        button {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Acton</th>
+                </tr>
+            </thead>
+            <tbody id="table_body"></tbody>
+        </table>
+    </div>
+    <script>
+        const jsonData = `[
+                {"id": 1, "name": "Alice Johnson", "email": "alice@example.com"},
+                {"id": 2, "name": "Bob Smith", "email": "bob@example.com"},
+                {"id": 3, "name": "Charlie Brown", "email": "charlie@example.com"},
+                {"id": 4, "name": "David Wilson", "email": "david@example.com"},
+                {"id": 5, "name": "Emma Davis", "email": "emma@example.com"},
+                {"id": 6, "name": "Frank Thomas", "email": "frank@example.com"},
+                {"id": 7, "name": "Grace Miller", "email": "grace@example.com"},
+                {"id": 8, "name": "Henry White", "email": "henry@example.com"},
+                {"id": 9, "name": "Isabella Moore", "email": "isabella@example.com"},
+                {"id": 10, "name": "Jack Taylor", "email": "jack@example.com"}
+                ]`;
+        const data = JSON.parse(jsonData);
+        const table = document.getElementById("table_body");
+        data.forEach(obj=>{
+            table.innerHTML+=`<tr>
+                <td>${obj.id}</td>
+                <td>${obj.name}</td>
+                <td>${obj.email}</td>
+                <td><button onclick="deleteRow(this)">DELETE</button></td>
+                </tr>`
+        });
+
+        function deleteRow(button) {
+            const row = button.closest('tr');
+            row.remove();
+        }
+        
+    </script>
+</body>
+</html>
