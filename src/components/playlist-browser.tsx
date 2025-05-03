@@ -29,8 +29,11 @@ const PlaylistBrowser: React.FC<PlaylistBrowserProps> = ({
 
     let completedCount = 0;
     videos.forEach(video => {
-      if (userProgress[video.id]?.completed) {
-        completedCount++;
+      // Check completion status using the userProgress object
+      // Handle both logged-in (object with `completed` property) and guest (boolean) progress formats if necessary
+      const progressEntry = userProgress[video.id];
+      if (progressEntry && progressEntry.completed) {
+         completedCount++;
       }
     });
     const percentage = videos.length > 0 ? Math.round((completedCount / videos.length) * 100) : 0;
@@ -109,4 +112,3 @@ const PlaylistBrowser: React.FC<PlaylistBrowserProps> = ({
 };
 
 export default PlaylistBrowser;
-```

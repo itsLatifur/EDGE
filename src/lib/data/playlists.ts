@@ -113,4 +113,3 @@ export const getPlaylistDetails = (playlistId: string): Playlist | null => {
     if (!summary) return null;
     return { ...summary, videos };
 }
-```
