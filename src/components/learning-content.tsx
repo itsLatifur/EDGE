@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState, useEffect, useRef} from 'react';
@@ -5,13 +6,21 @@ import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/compo
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Progress} from '@/components/ui/progress';
 import {Button} from '@/components/ui/button';
-import {PlayCircle, CheckCircle, Clock} from 'lucide-react';
+import {PlayCircle, CheckCircle, Circle, ListVideo, Info} from 'lucide-react';
+import {cn} from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ContentItem {
   id: string;
   title: string;
   url: string;
   duration: number; // Duration in seconds
+  description?: string; // Optional description
 }
 
 interface UserHistory {
@@ -21,214 +30,297 @@ interface UserHistory {
 interface LearningContentProps {
   title: string;
   type: 'video' | 'article' | 'playlist';
-  url?: string;
-  videoId?: string;
+  url?: string; // Used for single video/article or continue watching
+  // videoId?: string; // Kept for potential single video use cases without full details initially
   playlist?: ContentItem[];
   userHistory: UserHistory;
   onProgressUpdate: (videoId: string, currentTime: number) => void;
   currentTab?: string; // To know which tab's playlist is active
   isContinueWatching?: boolean; // Flag for the special "continue watching" card
   initialStartTime?: number; // Start time for "continue watching"
+  videoDetails?: ContentItem | null; // Pass full details when available, esp. for continue watching
 }
 
 const LearningContent: React.FC<LearningContentProps> = ({
   title,
   type,
   url,
-  videoId,
   playlist = [],
   userHistory,
   onProgressUpdate,
   currentTab,
   isContinueWatching = false,
   initialStartTime = 0,
+  videoDetails, // Receive full video details
 }) => {
   const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null);
   const [activeVideoStartTime, setActiveVideoStartTime] = useState<number>(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const internalUserHistoryRef = useRef(userHistory); // Ref to track latest history for progress update logic
 
-  // Determine the initial video for playlist view
+  // Update ref whenever userHistory prop changes
   useEffect(() => {
-    if (type === 'playlist' && playlist.length > 0 && !isContinueWatching) {
-      // Find the first unwatched or partially watched video in the current tab's playlist
-      const firstUnwatched = playlist.find(
-        (item) => !userHistory[item.id] || userHistory[item.id].watchedTime < item.duration
-      );
-      if (firstUnwatched) {
-        setActiveVideo(firstUnwatched);
-        setActiveVideoStartTime(userHistory[firstUnwatched.id]?.watchedTime || 0);
-      } else {
-        // If all are watched, default to the first video
-        setActiveVideo(playlist[0]);
-        setActiveVideoStartTime(userHistory[playlist[0].id]?.watchedTime || 0);
-      }
-    } else if (type === 'video' && url && videoId) {
-      // For single video or continue watching
-      setActiveVideo({id: videoId, title: title, url: url, duration: 0}); // Duration might not be known initially for single video
+    internalUserHistoryRef.current = userHistory;
+  }, [userHistory]);
+
+
+  // Determine the initial/active video based on type and props
+  useEffect(() => {
+    if (isContinueWatching && videoDetails) {
+      // Case 1: Continue Watching card - use provided videoDetails
+      setActiveVideo(videoDetails);
       setActiveVideoStartTime(initialStartTime);
+    } else if (type === 'playlist' && playlist.length > 0) {
+      // Case 2: Playlist view - find first unwatched/partially watched or default to first
+      const firstUnwatched = playlist.find(
+        (item) => !userHistory[item.id] || (item.duration > 0 && userHistory[item.id].watchedTime < item.duration * 0.99) // Consider watched if very close to end
+      );
+      const videoToPlay = firstUnwatched || playlist[0]; // Fallback to first video
+      setActiveVideo(videoToPlay);
+      setActiveVideoStartTime(userHistory[videoToPlay.id]?.watchedTime || 0);
+    } else if (type === 'video' && url && videoDetails) {
+        // Case 3: Single video display (if needed, though playlist is primary)
+        setActiveVideo(videoDetails);
+        setActiveVideoStartTime(initialStartTime);
+    } else {
+        // Reset if no valid case
+        setActiveVideo(null);
+        setActiveVideoStartTime(0);
     }
-  }, [type, playlist, userHistory, url, videoId, title, isContinueWatching, initialStartTime, currentTab]);
+    // Dependencies: Recalculate when playlist, history, or specific video details change
+  }, [type, playlist, userHistory, isContinueWatching, videoDetails, initialStartTime, currentTab]);
 
 
-  // Update iframe src when activeVideo or startTime changes
+  // Update iframe src only when activeVideo or its specific startTime changes
   useEffect(() => {
       if (activeVideo && iframeRef.current) {
           const videoUrl = new URL(activeVideo.url);
-          // Ensure we append 'start' correctly, considering existing params
+          // Use activeVideoStartTime state for the start parameter
           videoUrl.searchParams.set('start', Math.floor(activeVideoStartTime).toString());
           videoUrl.searchParams.set('enablejsapi', '1'); // Enable JS API
-          videoUrl.searchParams.set('origin', window.location.origin); // Important for JS API security
+          videoUrl.searchParams.set('origin', window.location.origin); // Necessary for API
 
-          if (iframeRef.current.src !== videoUrl.toString()) {
-            iframeRef.current.src = videoUrl.toString();
+          const newSrc = videoUrl.toString();
+          // Only update src if it's actually different to avoid unnecessary reloads
+          if (iframeRef.current.src !== newSrc) {
+            iframeRef.current.src = newSrc;
           }
+      } else if (!activeVideo && iframeRef.current) {
+          // Clear src if no active video
+          iframeRef.current.src = '';
       }
-  }, [activeVideo, activeVideoStartTime]);
+  }, [activeVideo, activeVideoStartTime]); // Depends only on activeVideo object and its start time state
 
 
-  // Set up interval to track video progress via YouTube IFrame Player API (simplified example)
+  // Set up interval to track video progress (Simplified)
+  // NOTE: This is a basic polling mechanism. A robust solution would use the YouTube IFrame Player API
+  //       to get accurate currentTime updates via postMessage events. Implementing the full API
+  //       is complex and outside the scope of this basic example.
   useEffect(() => {
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
     }
 
     if (activeVideo && type !== 'article') {
-        // Basic time tracking - a real implementation would use the YouTube API for accuracy
-        // This is a placeholder as the YT API setup is complex for this context
+        // Start tracking from the current activeVideoStartTime
         let pseudoCurrentTime = activeVideoStartTime;
+
         progressIntervalRef.current = setInterval(() => {
-             if (activeVideo) { // Check if activeVideo is still valid
-                pseudoCurrentTime += 1;
-                // Check against known duration if available, otherwise estimate
-                const knownDuration = activeVideo.duration || Infinity;
-                if(pseudoCurrentTime <= knownDuration) {
-                    onProgressUpdate(activeVideo.id, pseudoCurrentTime);
-                } else {
+             const currentActiveVideo = activeVideo; // Capture current active video in this closure
+             if (currentActiveVideo) {
+                pseudoCurrentTime += 1; // Increment time every second
+
+                // Use the duration from the activeVideo object
+                const knownDuration = currentActiveVideo.duration;
+
+                // Get the latest watched time from the ref to avoid stale state
+                const latestWatchedTime = internalUserHistoryRef.current[currentActiveVideo.id]?.watchedTime || 0;
+
+                // Update progress if the pseudo time is greater than the last known watched time
+                // and within the video duration (if known)
+                if (pseudoCurrentTime > latestWatchedTime && (knownDuration <= 0 || pseudoCurrentTime <= knownDuration)) {
+                    onProgressUpdate(currentActiveVideo.id, pseudoCurrentTime);
+                }
+
+                // Stop interval if duration is known and pseudo time exceeds it
+                if (knownDuration > 0 && pseudoCurrentTime >= knownDuration) {
                    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
                 }
              } else {
-                 if (progressIntervalRef.current) clearInterval(progressIntervalRef.current); // Clear if video changed
+                 // Clear interval if video becomes null
+                 if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
              }
-
-        }, 1000);
+        }, 1000); // Update every second
     }
 
+    // Cleanup function to clear interval when component unmounts or activeVideo changes
     return () => {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
     };
-    // Re-run effect when activeVideo changes
-  }, [activeVideo, onProgressUpdate, activeVideoStartTime]);
+    // Rerun this effect ONLY when activeVideo changes, or the initial start time changes
+  }, [activeVideo, activeVideoStartTime, onProgressUpdate]);
 
 
   const handlePlaylistItemClick = (item: ContentItem) => {
-    setActiveVideo(item);
-    setActiveVideoStartTime(userHistory[item.id]?.watchedTime || 0);
+    if (activeVideo?.id !== item.id) {
+        setActiveVideo(item);
+        // Set start time based on history, defaulting to 0 if no history
+        setActiveVideoStartTime(internalUserHistoryRef.current[item.id]?.watchedTime || 0);
+    }
   };
 
   const getVideoProgress = (item: ContentItem): number => {
-      const history = userHistory[item.id];
-      if (!history || !item.duration) return 0;
+      const history = internalUserHistoryRef.current[item.id];
+      if (!history || !item.duration || item.duration <= 0) return 0;
+      // Calculate progress, ensuring it doesn't exceed 100%
       return Math.min(100, (history.watchedTime / item.duration) * 100);
   }
 
   const formatTime = (seconds: number): string => {
+      if (isNaN(seconds) || seconds < 0) return "0:00";
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = Math.floor(seconds % 60);
       return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   }
 
+  const getWatchedTime = (itemId: string): number => {
+      return internalUserHistoryRef.current[itemId]?.watchedTime || 0;
+  }
+
+
   return (
-    <Card className="overflow-hidden shadow-lg transition-shadow hover:shadow-xl duration-300">
+    <Card className={cn("overflow-hidden shadow-lg transition-shadow hover:shadow-xl duration-300", {
+        'bg-secondary/50': isContinueWatching // Slightly different background for continue watching
+    })}>
+      {/* Header only shown for playlist view, not for continue watching */}
       {!isContinueWatching && type === 'playlist' && (
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-primary">{title}</CardTitle>
-            <CardDescription>Select a video from the playlist to start learning.</CardDescription>
+            <CardTitle className="text-xl font-semibold text-primary flex items-center gap-2">
+                <ListVideo className="h-5 w-5" /> {title}
+            </CardTitle>
+            <CardDescription>Select a video from the playlist below to start learning.</CardDescription>
           </CardHeader>
       )}
-      <CardContent className={`p-0 ${type === 'playlist' ? 'md:grid md:grid-cols-3 gap-0' : ''}`}>
-        {type === 'playlist' && activeVideo && (
-          <div className="md:col-span-2 aspect-video border-b md:border-b-0 md:border-r">
+
+      <CardContent className={cn("p-0", {
+        'md:grid md:grid-cols-10 gap-0': type === 'playlist' && !isContinueWatching, // Adjust grid for playlist view
+        'block': type === 'video' || isContinueWatching, // Single column for video/continue watching
+      })}>
+
+        {/* Video Player Area */}
+        {(type === 'playlist' || type === 'video') && (activeVideo || url) && (
+          <div className={cn("aspect-video", {
+              'md:col-span-7': type === 'playlist' && !isContinueWatching, // Video takes more space in playlist view on desktop
+              'md:col-span-10': type === 'video' || isContinueWatching, // Full width for single video or continue watching
+              'border-b md:border-b-0 md:border-r': type === 'playlist' && !isContinueWatching // Border separates video and list
+          })}>
             <iframe
               ref={iframeRef}
               width="100%"
               height="100%"
-              src={activeVideo ? `${activeVideo.url}?start=${Math.floor(activeVideoStartTime)}&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}` : ''}
-              title={activeVideo?.title || 'YouTube video player'}
+              // src is set via useEffect to avoid direct manipulation causing reloads
+              title={activeVideo?.title || title || 'YouTube video player'}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
-              className="transition-opacity duration-500 ease-in-out"
-              key={activeVideo?.id} // Force re-render on video change
+              className="transition-opacity duration-500 ease-in-out block bg-black" // Ensure it's a block element
+              key={activeVideo?.id || videoDetails?.id} // Force iframe re-render if the video ID changes
             ></iframe>
           </div>
         )}
 
-        {type === 'video' && url && (
-           <div className="aspect-video">
-            <iframe
-                ref={iframeRef}
-                width="100%"
-                height="100%"
-                src={url ? `${url}&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}` : ''}
-                title={title || 'YouTube video player'}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-                className="transition-opacity duration-500 ease-in-out"
-             ></iframe>
-          </div>
-        )}
-
-
-        {type === 'playlist' && (
-          <ScrollArea className="md:col-span-1 h-64 md:h-full">
-            <div className="p-4 space-y-2">
-              <h3 className="font-medium text-base mb-2 px-2">Playlist</h3>
+        {/* Playlist Area */}
+        {type === 'playlist' && !isContinueWatching && (
+          <ScrollArea className="md:col-span-3 h-64 md:h-[calc(100vh-250px)]"> {/* Adjust height */}
+            <div className="p-3 space-y-2">
               {playlist.map((item) => {
                 const progress = getVideoProgress(item);
-                const isWatched = progress >= 99; // Consider watched if near 100%
+                const watchedTime = getWatchedTime(item.id);
+                const isCompleted = progress >= 99; // Consider completed if very close to end
                 const isActive = activeVideo?.id === item.id;
+
+                let IconComponent = Circle;
+                let iconColor = "text-muted-foreground";
+                if (isCompleted) {
+                    IconComponent = CheckCircle;
+                    iconColor = "text-green-500";
+                } else if (isActive) {
+                    IconComponent = PlayCircle;
+                    iconColor = "text-primary animate-pulse";
+                } else if (watchedTime > 0) {
+                    IconComponent = PlayCircle; // Show play if partially watched but not active
+                    iconColor = "text-primary/60";
+                }
+
                 return (
-                  <Button
-                    key={item.id}
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={`w-full justify-start h-auto py-2 px-2 text-left relative transition-all duration-200 ${isActive ? 'bg-accent shadow-inner' : ''}`}
-                    onClick={() => handlePlaylistItemClick(item)}
-                  >
-                    <div className="flex items-center space-x-3 w-full">
-                      {isWatched ? (
-                         <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                       ) : (
-                         isActive ? <PlayCircle className="h-5 w-5 text-primary flex-shrink-0 animate-pulse" /> : <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <TooltipProvider key={item.id} delayDuration={300}>
+                   <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={isActive ? "secondary" : "ghost"}
+                        className={cn(
+                          "w-full justify-start h-auto py-2.5 px-3 text-left relative transition-all duration-200 rounded-md",
+                           isActive ? 'bg-accent shadow-inner ring-1 ring-primary/20' : 'hover:bg-muted/50'
+                        )}
+                        onClick={() => handlePlaylistItemClick(item)}
+                      >
+                        <div className="flex items-start space-x-3 w-full">
+                           <IconComponent className={cn("h-5 w-5 mt-0.5 flex-shrink-0", iconColor)} />
+                           <div className="flex-grow overflow-hidden mr-2">
+                               <p className={`text-sm font-medium truncate ${isActive ? 'text-accent-foreground' : 'text-foreground'}`}>{item.title}</p>
+                               <p className="text-xs text-muted-foreground">
+                                    {formatTime(item.duration)}
+                                    {watchedTime > 0 && ` | Watched: ${formatTime(watchedTime)}`}
+                               </p>
+                                {item.description && (
+                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                                )}
+                          </div>
+                        </div>
+                        {progress > 0 && (
+                            <Progress
+                              value={progress}
+                              className="absolute bottom-0 left-0 right-0 h-1 rounded-b-md rounded-t-none"
+                              aria-label={`${item.title} progress: ${Math.round(progress)}%`}
+                            />
+                        )}
+                      </Button>
+                      </TooltipTrigger>
+                       {(item.description || (watchedTime > 0)) && (
+                           <TooltipContent side="left" align="center" className="max-w-xs">
+                             <p className="font-medium">{item.title}</p>
+                             {item.description && <p className="text-sm text-muted-foreground my-1">{item.description}</p>}
+                             <p className="text-xs">Duration: {formatTime(item.duration)}</p>
+                             {watchedTime > 0 && <p className="text-xs">Watched: {formatTime(watchedTime)} ({Math.round(progress)}%)</p>}
+                           </TooltipContent>
                        )}
-                       <div className="flex-grow overflow-hidden">
-                           <p className={`text-sm font-medium truncate ${isActive ? 'text-accent-foreground' : ''}`}>{item.title}</p>
-                           <p className="text-xs text-muted-foreground">Duration: {formatTime(item.duration)}</p>
-                      </div>
-                    </div>
-                    {progress > 0 && (
-                        <Progress value={progress} className="absolute bottom-0 left-0 right-0 h-1 rounded-none" aria-label={`${item.title} progress: ${Math.round(progress)}%`} />
-                    )}
-                  </Button>
+                    </Tooltip>
+                  </TooltipProvider>
                 );
               })}
             </div>
           </ScrollArea>
         )}
 
+        {/* Article Area (Placeholder) */}
         {type === 'article' && url && (
-          <div className="p-6">
-             <h2 className="text-lg font-semibold mb-4">{title}</h2>
-             {/* In a real app, fetch and render article content here */}
-             <p className="text-muted-foreground">Article content for "{title}" would be displayed here. This could involve fetching markdown or using an embedded view.</p>
-             <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent-foreground hover:underline mt-4 inline-block">
-               Read full article
-             </a>
+          <div className="p-6 md:col-span-10">
+             <CardHeader>
+                 <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5"/> {title}</CardTitle>
+             </CardHeader>
+             <CardContent>
+                 {/* In a real app, fetch and render article content here */}
+                 <p className="text-muted-foreground mb-4">Article content for "{title}" would be displayed here. This could involve fetching markdown or using an embedded view.</p>
+                 <Button asChild variant="link" className="px-0">
+                     <a href={url} target="_blank" rel="noopener noreferrer">
+                       Read full article
+                     </a>
+                 </Button>
+             </CardContent>
           </div>
         )}
       </CardContent>
