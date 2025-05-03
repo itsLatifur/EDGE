@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
@@ -70,7 +69,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
    useEffect(() => {
     setIsVideoLoading(true);
     let videoToPlay: ContentItem | null = null;
-    let startTime = 0;
+    let determinedStartTime = 0; // Renamed to avoid confusion with prop
 
     if (playlist.videos.length > 0) {
         // Priority 1: Initial URL Parameters (provided via props)
@@ -79,7 +78,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
             if (foundVideo) {
                 console.log(`Setting initial video from URL: ${initialVideoId} at ${initialStartTime}s`);
                 videoToPlay = foundVideo;
-                startTime = initialStartTime > 0 ? initialStartTime : (userProgress[initialVideoId]?.watchedTime || 0);
+                // Use URL time if > 0, otherwise fallback to saved progress, then 0
+                determinedStartTime = initialStartTime > 0 ? initialStartTime : (userProgress[initialVideoId]?.watchedTime || 0);
             } else {
                 console.warn(`Video ID ${initialVideoId} from URL not found in playlist ${playlist.id}.`);
                  // Fallback: Find first unwatched or first video if URL video not found
@@ -87,7 +87,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     (item) => !userProgress[item.id]?.completed
                 );
                 videoToPlay = firstUnwatched || playlist.videos[0];
-                startTime = userProgress[videoToPlay.id]?.watchedTime || 0;
+                determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
             }
         } else {
             // Priority 2: First uncompleted video (if no URL params)
@@ -97,25 +97,25 @@ const LearningContent: React.FC<LearningContentProps> = ({
             if (firstUnwatched) {
                 console.log(`Starting first unwatched video: ${firstUnwatched.id}`);
                 videoToPlay = firstUnwatched;
-                startTime = userProgress[firstUnwatched.id]?.watchedTime || 0;
+                determinedStartTime = userProgress[firstUnwatched.id]?.watchedTime || 0;
             } else {
                 // Priority 3: First video overall (fallback)
                  console.log(`Falling back to first video: ${playlist.videos[0].id}`);
                 videoToPlay = playlist.videos[0];
-                startTime = userProgress[videoToPlay.id]?.watchedTime || 0;
+                determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
             }
         }
 
         setActiveVideo(videoToPlay);
-        setActiveVideoStartTime(startTime);
+        setActiveVideoStartTime(determinedStartTime);
     } else {
         setActiveVideo(null);
         setActiveVideoStartTime(0);
         setIsVideoLoading(false);
     }
-    lastReportedTimeRef.current = startTime;
+    lastReportedTimeRef.current = determinedStartTime; // Use determinedStartTime
 
-  }, [playlist.id, playlist.videos, userProgress, initialVideoId, initialStartTime]);
+  }, [playlist.id, playlist.videos, userProgress, initialVideoId, initialStartTime]); // Dependencies remain the same
 
 
   // Update iframe src only when activeVideo or its specific startTime changes
@@ -260,7 +260,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
     } else {
          console.log(`Playlist item clicked: ${item.id} (already active)`);
     }
-  }, [activeVideo?.id, userProgress, playlist.id, playlist.category]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVideo?.id, userProgress, playlist.id, playlist.category]); // Removed router dependency for now
 
 
   // Memoize calculation for progress based on userProgress and item duration
@@ -502,4 +503,3 @@ const LearningContent: React.FC<LearningContentProps> = ({
 };
 
 export default LearningContent;
-```
