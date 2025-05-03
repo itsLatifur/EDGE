@@ -21,7 +21,8 @@ interface LearningContentProps {
   playlist: Playlist; // Use the Playlist interface
   userProgress: UserProgress; // Can be an empty object {} but not null
   onProgressUpdate: (videoId: string, currentTime: number) => void;
-  currentTab?: string; // Keep for potential future use, but logic primarily uses playlist prop
+  initialVideoId?: string | null; // Optional initial video ID from URL
+  initialStartTime?: number; // Optional initial start time from URL
 }
 
 // Helper function outside component
@@ -36,7 +37,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
   playlist,
   userProgress, // userProgress is guaranteed to be an object, potentially empty
   onProgressUpdate,
-  currentTab,
+  initialVideoId,
+  initialStartTime = 0,
 }) => {
   const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null);
   const [activeVideoStartTime, setActiveVideoStartTime] = useState<number>(0);
@@ -44,47 +46,79 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastReportedTimeRef = useRef<number>(0); // Track last reported time to reduce updates
+  const isInitialLoadHandledRef = useRef(false); // Track if initial URL params have been handled
 
 
-  // Determine the initial/active video based on the provided playlist and userProgress
+  // Determine the initial/active video based on the provided playlist, userProgress, and initial URL params
   useEffect(() => {
+     // Prevent re-running this logic after the first mount or if playlist changes without URL params
+     if (isInitialLoadHandledRef.current && !initialVideoId) {
+        // If initial load was handled and there's no new initialVideoId from props, don't reset based on progress again.
+        // Let the user's interaction (handlePlaylistItemClick) manage the active video.
+        return;
+     }
+
     setIsVideoLoading(true); // Assume loading when dependencies change
     let videoToPlay: ContentItem | null = null;
-    let startTime = 0; // Declare startTime here with default value
+    let startTime = 0;
 
     if (playlist.videos.length > 0) {
-      // Find the most recently watched video within *this* playlist
-      const playlistVideoIds = new Set(playlist.videos.map(v => v.id));
+      // --- Priority 1: Initial URL Parameters ---
+      if (initialVideoId) {
+         const foundVideo = playlist.videos.find(v => v.id === initialVideoId);
+         if (foundVideo) {
+            console.log(`Setting initial video from URL: ${initialVideoId} at ${initialStartTime}s`);
+            videoToPlay = foundVideo;
+            // Use initialStartTime from URL, fallback to user progress for that video, then 0
+            startTime = initialStartTime > 0 ? initialStartTime : (userProgress[initialVideoId]?.watchedTime || 0);
+            isInitialLoadHandledRef.current = true; // Mark initial load as handled
+         } else {
+             console.warn(`Video ID ${initialVideoId} from URL not found in playlist ${playlist.id}.`);
+             // Fallback to default logic if URL video ID is invalid
+             isInitialLoadHandledRef.current = false; // Reset if invalid
+         }
+      }
 
-      // userProgress is now guaranteed to be an object
-      const relevantHistory = Object.entries(userProgress)
-          .filter(([videoId, data]) =>
-              playlistVideoIds.has(videoId) &&
-              data?.lastWatched instanceof Date && // Ensure lastWatched is a Date
-              data.watchedTime >= 0 // Allow 0 watched time
-          )
-          // Convert to array of objects with videoId for easier sorting/finding
-          .map(([videoId, data]) => ({ videoId, ...data }))
-          .sort((a, b) => b.lastWatched.getTime() - a.lastWatched.getTime()); // Sort by most recent
+      // --- Priority 2: Continue from last watched (if no valid URL params) ---
+      if (!videoToPlay) {
+          const playlistVideoIds = new Set(playlist.videos.map(v => v.id));
+          const relevantHistory = Object.entries(userProgress)
+              .filter(([videoId, data]) =>
+                  playlistVideoIds.has(videoId) &&
+                  data?.lastWatched instanceof Date &&
+                  data.watchedTime >= 0
+              )
+              .map(([videoId, data]) => ({ videoId, ...data }))
+              .sort((a, b) => b.lastWatched.getTime() - a.lastWatched.getTime());
 
-
-      if (relevantHistory.length > 0) {
-          const latestEntry = relevantHistory[0];
-          const videoDetails = playlist.videos.find(v => v.id === latestEntry.videoId);
-          // Resume if not completed (using the 'completed' flag or time check)
-          if (videoDetails && !latestEntry.completed && latestEntry.watchedTime < videoDetails.duration * 0.98) {
-              videoToPlay = videoDetails;
-              startTime = latestEntry.watchedTime; // Update startTime
+          if (relevantHistory.length > 0) {
+              const latestEntry = relevantHistory[0];
+              const videoDetails = playlist.videos.find(v => v.id === latestEntry.videoId);
+              if (videoDetails && !latestEntry.completed && latestEntry.watchedTime < videoDetails.duration * 0.98) {
+                 console.log(`Resuming video: ${videoDetails.id} at ${latestEntry.watchedTime}s`);
+                 videoToPlay = videoDetails;
+                 startTime = latestEntry.watchedTime;
+              }
           }
       }
 
-      // If no resumable video found, find the first uncompleted in order
+      // --- Priority 3: First uncompleted video (if no resumable and no valid URL params) ---
       if (!videoToPlay) {
           const firstUnwatched = playlist.videos.find(
-              (item) => !userProgress[item.id]?.completed // Check the completed flag
+              (item) => !userProgress[item.id]?.completed
           );
-          videoToPlay = firstUnwatched || playlist.videos[0]; // Fallback to the very first video
-          startTime = userProgress[videoToPlay.id]?.watchedTime || 0; // Update startTime
+          if (firstUnwatched) {
+            console.log(`Starting first unwatched video: ${firstUnwatched.id}`);
+            videoToPlay = firstUnwatched;
+            startTime = userProgress[firstUnwatched.id]?.watchedTime || 0; // Start from beginning or saved time
+          }
+      }
+
+      // --- Priority 4: First video overall (fallback) ---
+      if (!videoToPlay) {
+          console.log(`Falling back to first video: ${playlist.videos[0].id}`);
+          videoToPlay = playlist.videos[0];
+          startTime = userProgress[videoToPlay.id]?.watchedTime || 0;
       }
 
       setActiveVideo(videoToPlay);
@@ -95,38 +129,61 @@ const LearningContent: React.FC<LearningContentProps> = ({
       setActiveVideo(null);
       setActiveVideoStartTime(0);
       setIsVideoLoading(false);
+      isInitialLoadHandledRef.current = false; // Reset handled flag
     }
     lastReportedTimeRef.current = startTime; // Reset last reported time when video changes
 
-    // Depend only on the playlist ID and the userProgress object itself.
-    // Using playlist.id assumes if the ID changes, the content might have changed.
-    // Directly depending on userProgress covers updates from logins, merges, etc.
-  }, [playlist.id, userProgress]);
+    // Use initialVideoId and initialStartTime as dependencies to react to URL changes
+    // Also depend on playlist.id and userProgress
+  }, [playlist.id, userProgress, initialVideoId, initialStartTime]);
 
 
   // Update iframe src only when activeVideo or its specific startTime changes
   useEffect(() => {
       if (activeVideo && iframeRef.current) {
-          setIsVideoLoading(true); // Set loading state before changing src
-          const videoUrl = new URL(activeVideo.url);
-          // Enable JS API for YouTube Player API interaction (if needed later)
+          // Only update if the video or start time has actually changed
+           const videoUrl = new URL(activeVideo.url);
           videoUrl.searchParams.set('enablejsapi', '1');
-          videoUrl.searchParams.set('autoplay', '1'); // Autoplay the selected video
-          videoUrl.searchParams.set('modestbranding', '1'); // Reduce YouTube logo
-          videoUrl.searchParams.set('rel', '0'); // Don't show related videos at the end
-          videoUrl.searchParams.set('start', Math.floor(activeVideoStartTime).toString());
+          videoUrl.searchParams.set('autoplay', '1');
+          videoUrl.searchParams.set('modestbranding', '1');
+          videoUrl.searchParams.set('rel', '0');
+           const currentStartTime = Math.floor(activeVideoStartTime);
+          videoUrl.searchParams.set('start', currentStartTime.toString());
           if (typeof window !== 'undefined') {
             videoUrl.searchParams.set('origin', window.location.origin);
           }
-
           const newSrc = videoUrl.toString();
-          // Only update src if it's actually different to prevent unnecessary reloads
-          if (iframeRef.current.src !== newSrc) {
+
+          // Check if src needs updating (different video or significantly different start time if same video)
+           const currentSrc = iframeRef.current.src;
+           let needsUpdate = false;
+           if (!currentSrc) {
+               needsUpdate = true; // No src set yet
+           } else {
+               try {
+                   const currentUrl = new URL(currentSrc);
+                   const currentVideoIdFromSrc = currentUrl.pathname.split('/').pop(); // Basic way to get ID
+                   const currentStartTimeFromSrc = parseInt(currentUrl.searchParams.get('start') || '0', 10);
+
+                   if (currentVideoIdFromSrc !== activeVideo.id || Math.abs(currentStartTimeFromSrc - currentStartTime) > 2) {
+                       // Update if different video ID or if start time differs by more than 2 seconds
+                       needsUpdate = true;
+                   }
+               } catch (e) {
+                   // If currentSrc is invalid, likely needs update
+                   needsUpdate = true;
+                   console.error("Could not parse current iframe src:", currentSrc, e);
+               }
+           }
+
+
+          if (needsUpdate) {
+              console.log(`Updating iframe src for ${activeVideo.id} to start at ${currentStartTime}s`);
+              setIsVideoLoading(true); // Set loading state before changing src
               iframeRef.current.src = newSrc;
           } else {
-              // If src is the same but start time changed, potentially seek?
-              // For simplicity now, we just set loading to false if src is same
-               setIsVideoLoading(false);
+               // If src is the same and start time is close, assume it's playing, don't show loading
+               if (isVideoLoading) setIsVideoLoading(false);
           }
       } else if (!activeVideo && iframeRef.current) {
           iframeRef.current.src = ''; // Clear src if no active video
@@ -134,93 +191,100 @@ const LearningContent: React.FC<LearningContentProps> = ({
       } else if (!activeVideo) {
          setIsVideoLoading(false);
       }
-  }, [activeVideo, activeVideoStartTime]); // Only depends on the active video and start time
+  }, [activeVideo, activeVideoStartTime, isVideoLoading]); // Added isVideoLoading to deps to potentially clear loading state
+
+
+ // Function to start the progress tracking interval (memoized)
+ const startProgressTracking = useCallback(() => {
+    if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+    }
+
+    if (activeVideo && !isVideoLoading) {
+        // Use the state's startTime, but allow the interval to update it locally
+        let currentTrackedTime = activeVideoStartTime;
+        lastReportedTimeRef.current = activeVideoStartTime; // Sync ref with state
+
+        progressIntervalRef.current = setInterval(() => {
+            const currentIntervalVideo = activeVideo; // Capture activeVideo at interval creation
+            if (!currentIntervalVideo) {
+                if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+                return;
+            }
+
+            currentTrackedTime += 1; // Increment time
+            const knownDuration = currentIntervalVideo.duration;
+
+            // Report progress every 5 seconds, near start (first 5s), or near end (last 5s)
+            const shouldReport = currentTrackedTime - lastReportedTimeRef.current >= 5 ||
+                                currentTrackedTime <= 5 ||
+                                (knownDuration > 0 && knownDuration - currentTrackedTime <= 5);
+
+            if (knownDuration <= 0 || currentTrackedTime <= knownDuration) {
+                if (shouldReport) {
+                console.log(`Reporting progress for ${currentIntervalVideo.id} at ${currentTrackedTime}s`);
+                onProgressUpdate(currentIntervalVideo.id, currentTrackedTime);
+                lastReportedTimeRef.current = currentTrackedTime;
+                }
+            } else {
+                // Time exceeded known duration, report final time if not already done and stop
+                if (lastReportedTimeRef.current < knownDuration) {
+                console.log(`Reporting final progress for ${currentIntervalVideo.id} at ${knownDuration}s`);
+                onProgressUpdate(currentIntervalVideo.id, knownDuration);
+                lastReportedTimeRef.current = knownDuration;
+                }
+                if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+            }
+        }, 1000); // Check every second
+    }
+ }, [activeVideo, isVideoLoading, activeVideoStartTime, onProgressUpdate]);
+
 
   // Handle iframe load event
   const handleIframeLoad = useCallback(() => {
+    console.log(`Iframe loaded for ${activeVideo?.id}`);
     setIsVideoLoading(false);
-    lastReportedTimeRef.current = activeVideoStartTime; // Ensure starting point is correct after load
-     // Clear any existing interval before starting a new one
-     if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
-      // Restart the progress interval tracking after iframe loads
-      startProgressTracking();
-
-  }, [activeVideoStartTime]); // Added missing dependency `startProgressTracking` - Re-added startProgressTracking to dependencies
+    // Don't reset reported time here, rely on startProgressTracking to initialize correctly
+    // Restart the progress tracking interval after iframe loads
+    startProgressTracking();
+  }, [activeVideo?.id, startProgressTracking]); // Depend on startProgressTracking
 
 
-  // Function to start the progress tracking interval
-    const startProgressTracking = useCallback(() => {
-      if (progressIntervalRef.current) {
-         clearInterval(progressIntervalRef.current);
-      }
-
+  // Effect to manage the interval lifecycle
+  useEffect(() => {
+      // Start tracking when video is ready (active and not loading)
       if (activeVideo && !isVideoLoading) {
-        let pseudoCurrentTime = activeVideoStartTime; // Initialize with start time
-
-        progressIntervalRef.current = setInterval(() => {
-          const currentIntervalVideo = activeVideo; // Capture activeVideo at interval creation
-          if (!currentIntervalVideo) {
-            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-            return;
-          }
-
-          pseudoCurrentTime += 1; // Increment time
-          const knownDuration = currentIntervalVideo.duration;
-
-          // Report progress every 5 seconds, near start, or near end
-          const shouldReport = pseudoCurrentTime - lastReportedTimeRef.current >= 5 ||
-                             pseudoCurrentTime <= 5 ||
-                             (knownDuration > 0 && knownDuration - pseudoCurrentTime <= 5);
-
-
-          if (knownDuration <= 0 || pseudoCurrentTime <= knownDuration) {
-             if (shouldReport) {
-               onProgressUpdate(currentIntervalVideo.id, pseudoCurrentTime);
-               lastReportedTimeRef.current = pseudoCurrentTime;
-             }
-          } else {
-            // Time exceeded known duration, report final time if not already done and stop
-            if (lastReportedTimeRef.current < knownDuration) {
-              onProgressUpdate(currentIntervalVideo.id, knownDuration);
-              lastReportedTimeRef.current = knownDuration;
-            }
-            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-          }
-        }, 1000); // Check every second
+          startProgressTracking();
       }
-    }, [activeVideo, isVideoLoading, activeVideoStartTime, onProgressUpdate]); // Dependencies for the tracking logic
 
-
-    // Effect to manage the interval lifecycle
-    useEffect(() => {
-        // Start tracking when video is ready
-        if (activeVideo && !isVideoLoading) {
-            startProgressTracking();
-        }
-
-        // Cleanup function to clear interval when component unmounts or dependencies change
-        return () => {
-            if (progressIntervalRef.current) {
-            clearInterval(progressIntervalRef.current);
-            }
-        };
-    }, [activeVideo, isVideoLoading, startProgressTracking]); // Depend on video, loading state, and the tracking function itself
+      // Cleanup function to clear interval
+      return () => {
+          if (progressIntervalRef.current) {
+              clearInterval(progressIntervalRef.current);
+          }
+      };
+  }, [activeVideo, isVideoLoading, startProgressTracking]); // Depend on video, loading state, and the tracking function
 
 
   const handlePlaylistItemClick = useCallback((item: ContentItem) => {
     // Only update if a different video is clicked
     if (activeVideo?.id !== item.id) {
-      const startTime = userProgress[item.id]?.watchedTime || 0; // Access directly, it's an object
+      const startTime = userProgress[item.id]?.watchedTime || 0;
+      console.log(`Playlist item clicked: ${item.id}, setting start time to ${startTime}s`);
       setActiveVideo(item);
       setActiveVideoStartTime(startTime);
-      lastReportedTimeRef.current = startTime; // Reset reported time
-      setIsVideoLoading(true); // Set loading state for the new video
-       // Clear interval immediately when switching videos
+      // lastReportedTimeRef.current = startTime; // Reset reported time - Let startProgressTracking handle this
+      // setIsVideoLoading(true); // Set loading state - Let useEffect handle this based on src change
+       // Clear interval immediately when switching videos manually
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
+    } else {
+         console.log(`Playlist item clicked: ${item.id} (already active)`);
+         // Optional: If clicked video is already active, maybe seek to beginning?
+         // setActiveVideoStartTime(0);
+         // lastReportedTimeRef.current = 0;
+         // Or just do nothing
     }
   }, [activeVideo?.id, userProgress]); // Simplified dependencies
 
@@ -377,7 +441,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
            </TooltipProvider>
          );
        });
-   }, [playlist?.videos, activeVideo?.id, getVideoProgress, getWatchedTime, isVideoCompleted, getThumbnailHint, handlePlaylistItemClick, handleIframeLoad]); // Added handleIframeLoad
+   // Added handleIframeLoad as dependency - Removed handleIframeLoad from dependency array as it caused infinite loops
+   }, [playlist?.videos, activeVideo?.id, getVideoProgress, getWatchedTime, isVideoCompleted, getThumbnailHint, handlePlaylistItemClick]);
 
 
   return (
@@ -434,14 +499,14 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     ref={iframeRef}
                     width="100%"
                     height="100%"
+                    src="" // Initial src is empty, set by useEffect
                     title={activeVideo.title}
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
-                    className={cn("block transition-opacity duration-300", isVideoLoading ? "opacity-0" : "opacity-100")}
-                    key={activeVideo.id} // Force re-render on video change
+                    className={cn("block absolute inset-0 w-full h-full transition-opacity duration-300", isVideoLoading ? "opacity-0" : "opacity-100")}
+                    key={activeVideo.id} // Force re-render on video change? Maybe not needed if src logic is sound.
                     onLoad={handleIframeLoad}
-                    // Removed src here, handled by useEffect
                   ></iframe>
               )}
           </div>

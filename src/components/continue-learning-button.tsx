@@ -7,46 +7,75 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { mockPlaylists } from '@/lib/data/playlists'; // Import playlist data
-import type { ContentItem, UserProgressEntry } from '@/types';
+import type { ContentItem, UserProgressEntry, PlaylistType } from '@/types';
 import { loadGuestProgress } from '@/services/user-progress'; // Need guest progress for initial check
+import { getUserProgress } from '@/services/user-progress'; // Import getUserProgress
+
+// Updated return type
+interface ContinueData {
+  video: ContentItem;
+  playlistId: PlaylistType;
+  startTime: number;
+}
 
 // Helper function to find the next video to watch
-const findNextVideo = (progress: { [videoId: string]: UserProgressEntry } | null): ContentItem | null => {
+const findNextVideo = (progress: { [videoId: string]: UserProgressEntry } | null): ContinueData | null => {
   if (!progress) return null;
 
-  const allPlaylistVideos = Object.values(mockPlaylists).flatMap(p => p.videos);
-  const playlistVideoIds = new Set(allPlaylistVideos.map(v => v.id));
+  const allPlaylistVideosMap = new Map<string, { video: ContentItem; playlistId: PlaylistType }>();
+  Object.entries(mockPlaylists).forEach(([playlistId, playlist]) => {
+      playlist.videos.forEach(video => {
+          allPlaylistVideosMap.set(video.id, { video, playlistId: playlistId as PlaylistType });
+      });
+  });
 
   // Filter progress entries relevant to any known playlist video
   const relevantHistory = Object.entries(progress)
-    .filter(([videoId, data]) => playlistVideoIds.has(videoId) && data?.lastWatched instanceof Date && data.watchedTime >= 0) // Allow 0 watched time
-    .map(([videoId, data]) => ({ videoId, ...data }))
+    .filter(([videoId, data]) => allPlaylistVideosMap.has(videoId) && data?.lastWatched instanceof Date && data.watchedTime >= 0)
+    .map(([videoId, data]) => ({
+      videoId,
+      ...data,
+      playlistId: allPlaylistVideosMap.get(videoId)?.playlistId, // Add playlistId
+    }))
+    // Filter out entries where playlistId couldn't be determined (shouldn't happen with current setup)
+    .filter(entry => entry.playlistId)
     .sort((a, b) => b.lastWatched.getTime() - a.lastWatched.getTime()); // Sort by most recent activity
+
 
   // Find the most recently watched video that is NOT completed
   const lastIncomplete = relevantHistory.find(entry => !entry.completed);
 
   if (lastIncomplete) {
-    // Find the details of this video
-    return allPlaylistVideos.find(v => v.id === lastIncomplete.videoId) || null;
+    const details = allPlaylistVideosMap.get(lastIncomplete.videoId);
+    if (details && details.playlistId) { // Ensure details and playlistId are found
+       return {
+         video: details.video,
+         playlistId: details.playlistId,
+         startTime: lastIncomplete.watchedTime,
+       };
+    }
   }
 
   // If all watched videos are completed, or no history, find the very first video overall that isn't completed
-  for (const playlist of Object.values(mockPlaylists)) {
+  for (const playlistId in mockPlaylists) {
+      const playlist = mockPlaylists[playlistId as PlaylistType];
       for (const video of playlist.videos) {
           if (!progress[video.id]?.completed) {
-              return video; // Return the first uncompleted video found
+              return {
+                  video: video,
+                  playlistId: playlistId as PlaylistType,
+                  startTime: progress[video.id]?.watchedTime || 0, // Start from beginning or saved time
+              }; // Return the first uncompleted video found
           }
       }
   }
-
 
   return null; // No video found to continue
 };
 
 
 export default function ContinueLearningButton() {
-  const { user, userProfile, isGuest, loading: authLoading } = useAuth();
+  const { user, isGuest, loading: authLoading } = useAuth();
   const [userProgress, setUserProgress] = useState<{[videoId: string]: UserProgressEntry} | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
 
@@ -55,36 +84,46 @@ export default function ContinueLearningButton() {
       const fetchProgress = async () => {
           setIsLoadingProgress(true);
           let progressData = null;
-          if (!isGuest && user) {
-              // Fetch user progress (simplified, assuming getUserProgress exists and returns the right format)
-              const { getUserProgress } = await import('@/services/user-progress');
-              progressData = await getUserProgress(user.uid);
-          } else if (isGuest) {
-              // Load guest progress
-              progressData = loadGuestProgress();
+          try {
+              if (!isGuest && user) {
+                 console.log("Continue button: Fetching user progress");
+                 progressData = await getUserProgress(user.uid);
+              } else if (isGuest) {
+                 console.log("Continue button: Loading guest progress");
+                 progressData = loadGuestProgress();
+              }
+              setUserProgress(progressData);
+          } catch (error) {
+             console.error("Continue button: Error fetching progress", error);
+             setUserProgress(null); // Set to null on error
+          } finally {
+             setIsLoadingProgress(false);
           }
-          setUserProgress(progressData);
-          setIsLoadingProgress(false);
       };
 
       if (!authLoading) { // Only fetch after knowing auth state
           fetchProgress();
       }
+      // Clear progress if auth state changes to loading or no user/guest
+      else {
+          setUserProgress(null);
+          setIsLoadingProgress(true);
+      }
+      // Rerun when auth status changes
   }, [isGuest, user, authLoading]);
 
-  const videoToContinue = useMemo(() => {
+  const continueData = useMemo(() => {
       if (isLoadingProgress || authLoading) return null; // Don't calculate while loading
       return findNextVideo(userProgress);
   }, [userProgress, isLoadingProgress, authLoading]);
 
 
-  if (!videoToContinue || isLoadingProgress || authLoading) {
+  if (!continueData || isLoadingProgress || authLoading) {
     // Don't show if no video to continue or still loading
     return null;
   }
 
-  // Find the playlist this video belongs to for context (optional, but good for tooltip)
-  const playlist = Object.values(mockPlaylists).find(p => p.videos.some(v => v.id === videoToContinue.id));
+  const continueHref = `/?tab=${continueData.playlistId}&videoId=${continueData.video.id}&time=${Math.floor(continueData.startTime)}`;
 
   return (
     <Button
@@ -92,14 +131,14 @@ export default function ContinueLearningButton() {
       variant="default" // Use primary color
       size="lg" // Make it larger
       className={cn(
-        'fixed bottom-4 left-4 z-50 h-12 shadow-lg transition-opacity duration-300',
+        'fixed bottom-4 right-4 z-50 h-12 shadow-lg transition-opacity duration-300', // Changed left-4 to right-4
         'pl-4 pr-5' // Adjust padding for icon and text
       )}
-      aria-label={`Continue learning: ${videoToContinue.title}`}
+      aria-label={`Continue learning: ${continueData.video.title}`}
     >
-      <Link href="/"> {/* Link to the main learning page */}
+      <Link href={continueHref}> {/* Link to the main learning page with params */}
         <Play className="h-5 w-5 mr-2 fill-current" /> {/* Filled play icon */}
-        Continue: {playlist?.id.toUpperCase()} - {(videoToContinue.title.length > 25) ? videoToContinue.title.substring(0, 25) + '...' : videoToContinue.title}
+        Continue
       </Link>
     </Button>
   );
