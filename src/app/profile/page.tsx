@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -6,10 +5,11 @@ import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button'; // Import Button
 import { Progress } from '@/components/ui/progress';
 import { Star, Award, CheckSquare, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation'; // Use Next.js router
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function ProfilePage() {
@@ -31,8 +31,9 @@ export default function ProfilePage() {
   }
 
   // Placeholder for fetching detailed progress, replace with actual data fetching
+  // TODO: Fetch real progress data based on userProgress context or Firestore
   const learningProgress = {
-      html: 75, // Percentage completion
+      html: 75, // Example Percentage completion
       css: 40,
       javascript: 15,
   };
@@ -60,12 +61,12 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fadeIn">
       {/* User Info Card */}
       <Card className="overflow-hidden shadow-md">
         <CardHeader className="flex flex-col items-center space-y-4 bg-muted/30 p-6 text-center sm:flex-row sm:items-start sm:space-y-0 sm:space-x-6 sm:text-left">
           <Avatar className="h-24 w-24 border-4 border-background shadow-lg sm:h-20 sm:w-20">
-            {/* <AvatarImage src={userProfile?.photoURL} alt={userProfile.displayName} /> */}
+            {/* Use initials as fallback */}
             <AvatarFallback className="text-3xl sm:text-2xl">
               {getInitials(userProfile.displayName)}
             </AvatarFallback>
@@ -98,13 +99,13 @@ export default function ProfilePage() {
             {userProfile.badges.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {userProfile.badges.map((badgeId) => (
-                  <Badge key={badgeId} variant="secondary" className="text-xs capitalize">
+                  <Badge key={badgeId} variant="secondary" className="text-xs capitalize py-1 px-2.5">
                     {badgeId.replace(/-/g, ' ')} {/* Basic formatting */}
                   </Badge>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No badges earned yet. Keep learning!</p>
+              <p className="text-sm text-muted-foreground">No badges earned yet. Complete video playlists to earn them!</p>
             )}
           </CardContent>
         </Card>
@@ -114,8 +115,9 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <CheckSquare className="h-5 w-5 text-green-600" />
-              Learning Progress
+              Playlist Progress (Example)
             </CardTitle>
+            <CardDescription>Overall completion percentage for each topic.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -130,18 +132,18 @@ export default function ProfilePage() {
                 <span>CSS</span>
                 <span className="text-muted-foreground">{learningProgress.css}%</span>
               </div>
-              <Progress value={learningProgress.css} aria-label="CSS Progress" className="[&>div]:bg-[hsl(var(--chart-2))]" />
+              <Progress value={learningProgress.css} aria-label="CSS Progress" indicatorClassName="bg-[hsl(var(--chart-2))]" />
             </div>
             <div>
               <div className="mb-1 flex justify-between text-sm font-medium">
                 <span>JavaScript</span>
                 <span className="text-muted-foreground">{learningProgress.javascript}%</span>
               </div>
-              <Progress value={learningProgress.javascript} aria-label="JavaScript Progress" className="[&>div]:bg-[hsl(var(--chart-3))]" />
+              <Progress value={learningProgress.javascript} aria-label="JavaScript Progress" indicatorClassName="bg-[hsl(var(--chart-3))]" />
             </div>
-             {/* Add link back to dashboard */}
-             <Button variant="outline" size="sm" onClick={() => router.push('/')} className="mt-4">
-                Continue Learning
+             {/* Add link back to video dashboard */}
+             <Button variant="outline" size="sm" onClick={() => router.push('/videos')} className="mt-4">
+                Go to Videos
             </Button>
           </CardContent>
         </Card>
@@ -155,10 +157,10 @@ export default function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-             {/* This would be dynamically populated */}
+             {/* TODO: This should be dynamically populated based on UserProgress */}
             <p className="text-sm text-muted-foreground">No recent activity tracked yet.</p>
             {/* Example:
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>Completed "HTML Basics" - +10 points</li>
                 <li>Watched 15 mins of "CSS Flexbox"</li>
             </ul>

@@ -123,7 +123,8 @@ export default function ContinueLearningButton() {
     return null;
   }
 
-  const continueHref = `/?tab=${continueData.playlistId}&videoId=${continueData.video.id}&time=${Math.floor(continueData.startTime)}`;
+  // Update href to point to the /videos page
+  const continueHref = `/videos?tab=${continueData.playlistId}&videoId=${continueData.video.id}&time=${Math.floor(continueData.startTime)}`;
 
   return (
     <Button
@@ -131,12 +132,12 @@ export default function ContinueLearningButton() {
       variant="default" // Use primary color
       size="lg" // Make it larger
       className={cn(
-        'fixed bottom-4 right-4 z-50 h-12 shadow-lg transition-opacity duration-300', // Changed left-4 to right-4
+        'fixed bottom-4 right-4 z-50 h-12 shadow-lg transition-opacity duration-300',
         'pl-4 pr-5' // Adjust padding for icon and text
       )}
       aria-label={`Continue learning: ${continueData.video.title}`}
     >
-      <Link href={continueHref}> {/* Link to the main learning page with params */}
+      <Link href={continueHref}> {/* Link to the videos page with params */}
         <Play className="h-5 w-5 mr-2 fill-current" /> {/* Filled play icon */}
         Continue
       </Link>

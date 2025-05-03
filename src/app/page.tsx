@@ -1,370 +1,105 @@
-
 'use client';
 
-import React, {useState, useEffect, useCallback, Suspense} from 'react';
-import { useSearchParams } from 'next/navigation'; // Import useSearchParams
-import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
-import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/components/ui/card';
-import {Skeleton} from '@/components/ui/skeleton';
-import LearningContent from '@/components/learning-content';
-import {useToast} from '@/hooks/use-toast';
-import { PlayCircle, Loader2 } from 'lucide-react';
-import { useAuth } from '@/context/auth-context';
-import {
-    getUserProgress,
-    updateUserProgress,
-    awardPoints,
-    awardBadge,
-    loadGuestProgress,
-    updateGuestProgressEntry,
-    saveGuestProgress // Import saveGuestProgress
-} from '@/services/user-progress';
-import type { UserProgress, ContentItem, Playlist, PlaylistType } from '@/types';
+import React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { mockPlaylists } from '@/lib/data/playlists'; // Import playlists from the data file
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, Code, Palette, Zap } from 'lucide-react';
 
-// Helper function to find video details across all playlists (remains the same)
-const findVideoDetails = (videoId: string): { video: ContentItem; playlistId: PlaylistType } | undefined => {
-  for (const key in mockPlaylists) {
-    const playlistId = key as PlaylistType;
-    const playlist = mockPlaylists[playlistId];
-    const video = playlist.videos.find(v => v.id === videoId);
-    if (video) return { video, playlistId };
-  }
-  return undefined;
-}
+// Define learning topics
+const learningTopics = [
+  {
+    id: 'html',
+    title: 'HTML',
+    description: 'Learn the fundamental building blocks of the web. Structure content and create the skeleton of your websites.',
+    icon: Code,
+    color: 'text-orange-500',
+    bgColor: 'bg-orange-100 dark:bg-orange-900/30',
+    borderColor: 'border-orange-200 dark:border-orange-800/50',
+    link: '/videos?tab=html',
+  },
+  {
+    id: 'css',
+    title: 'CSS',
+    description: 'Style your websites and bring your designs to life. Control layout, colors, fonts, and create beautiful user interfaces.',
+    icon: Palette,
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    borderColor: 'border-blue-200 dark:border-blue-800/50',
+    link: '/videos?tab=css',
+  },
+  {
+    id: 'javascript',
+    title: 'JavaScript',
+    description: 'Add interactivity and dynamic behavior to your web pages. Handle user actions, fetch data, and build powerful web applications.',
+    icon: Zap,
+    color: 'text-yellow-500',
+    bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+    borderColor: 'border-yellow-200 dark:border-yellow-800/50',
+    link: '/videos?tab=javascript',
+  },
+];
 
-// Define Points/Badges structure (remains the same)
-const VIDEO_COMPLETION_POINTS = 10;
-const PLAYLIST_COMPLETION_BADGES: Record<PlaylistType, string> = {
-    html: 'html-master',
-    css: 'css-stylist',
-    javascript: 'javascript-ninja',
-};
+export default function HomePage() {
+  return (
+    <div className="animate-fadeIn space-y-12 mt-6">
+      {/* Hero Section */}
+      <section className="text-center py-10 bg-gradient-to-b from-background to-muted/30 rounded-lg shadow-sm border">
+        <h1 className="text-4xl font-bold tracking-tight text-foreground mb-4">
+          Master Web Development, Step-by-Step
+        </h1>
+        <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+          Welcome to Self-Learn! Dive into interactive video playlists covering HTML, CSS, and JavaScript. Start building your web development skills today, at your own pace.
+        </p>
+        <div className="flex justify-center gap-4">
+          <Button size="lg" asChild>
+            <Link href="/videos">
+              Start Learning Videos
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Link>
+          </Button>
+          <Button size="lg" variant="outline" asChild>
+            <Link href="/blogs">
+              Explore Resources
+            </Link>
+          </Button>
+        </div>
+      </section>
 
-// Component using useSearchParams needs to be wrapped in Suspense
-function HomePageContent() {
-    const { user, userProfile, isGuest, loading: authLoading, refreshUserProfile } = useAuth();
-    const [isLoading, setIsLoading] = useState(true); // Tracks progress loading specifically
-    const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
-    const { toast } = useToast();
-    const searchParams = useSearchParams(); // Get search params
-
-    // Read initial state from URL parameters
-    const initialTab = (searchParams.get('tab') as PlaylistType | null) || 'html';
-    const initialVideoId = searchParams.get('videoId');
-    const initialTime = parseInt(searchParams.get('time') || '0', 10);
-
-    const [activeTab, setActiveTab] = useState<PlaylistType>(initialTab);
-    const [initialVideoInfo, setInitialVideoInfo] = useState<{ videoId: string | null; startTime: number }>({
-        videoId: initialVideoId,
-        startTime: initialTime,
-    });
-
-     // Update activeTab if initialTab changes (e.g., navigation)
-    useEffect(() => {
-        setActiveTab(initialTab);
-    }, [initialTab]);
-
-    // Update initialVideoInfo if URL params change
-    useEffect(() => {
-        setInitialVideoInfo({ videoId: initialVideoId, startTime: initialTime });
-    }, [initialVideoId, initialTime]);
-
-
-    // Fetch user progress (Firestore or Local Storage)
-    useEffect(() => {
-        const fetchProgress = async () => {
-        setIsLoading(true); // Start loading progress data
-        let progressData: UserProgress | null = null;
-        try {
-            if (!isGuest && user) {
-            console.log("Fetching Firestore progress for user:", user.uid);
-            progressData = await getUserProgress(user.uid);
-            } else {
-            console.log("Loading guest progress from local storage");
-            progressData = loadGuestProgress();
-            }
-            setUserProgress(progressData || {}); // Use empty object if null/no progress found
-        } catch (error) {
-            console.error("Failed to fetch user progress:", error);
-            toast({
-            title: "Progress Load Error",
-            description: "Could not load your learning progress.",
-            variant: "destructive",
-            });
-            setUserProgress({}); // Fallback to empty progress on error
-        } finally {
-            setIsLoading(false); // Finish loading progress data
-        }
-        };
-
-        // Fetch progress only when auth state is resolved and we know if user is guest or not
-        if (!authLoading) {
-        fetchProgress();
-        }
-        // Add dependencies: authLoading, isGuest, user?.uid
-    }, [authLoading, isGuest, user?.uid, toast]);
-
-
-    // Initial welcome toast (adapted for guests)
-    useEffect(() => {
-        // Only show welcome *after* initial auth and progress loading is complete
-        if (!authLoading && !isLoading) {
-        if (!isGuest && userProfile) {
-            // toast({
-            // title: `Welcome Back, ${userProfile.displayName}!`,
-            // description: 'Ready to continue your learning journey?',
-            // duration: 5000,
-            // });
-        } else if (isGuest) {
-            // Optional: Welcome message for guests
-            // toast({
-            //   title: "Welcome, Guest!",
-            //   description: "Sign in to save your progress permanently.",
-            //   duration: 7000,
-            // });
-        }
-        }
-    }, [isGuest, userProfile, authLoading, isLoading, toast]); // Depend on loading states too
-
-
-    const handleProgressUpdate = useCallback(async (videoId: string, currentTime: number) => {
-        const videoDetailsResult = findVideoDetails(videoId);
-        if (!videoDetailsResult) return;
-        const { video: videoDetails } = videoDetailsResult;
-
-        const currentProgressState = userProgress || {};
-        const cappedTime = (!isNaN(currentTime)) ? Math.min(currentTime, videoDetails.duration) : (currentProgressState[videoId]?.watchedTime || 0);
-        const previousWatchedTime = currentProgressState[videoId]?.watchedTime || 0;
-        const isAlreadyCompleted = currentProgressState[videoId]?.completed || false;
-
-        const isNowCompleted = !isAlreadyCompleted && cappedTime >= videoDetails.duration * 0.95;
-        const needsUpdate = (cappedTime > previousWatchedTime + 1) || (isNowCompleted && !isAlreadyCompleted);
-
-        if (needsUpdate) {
-            const updatedProgressEntry = {
-                watchedTime: cappedTime,
-                lastWatched: new Date(),
-                completed: isAlreadyCompleted || isNowCompleted,
-            };
-            setUserProgress(prev => ({ ...(prev || {}), [videoId]: updatedProgressEntry }));
-
-            try {
-                if (!isGuest && user) {
-                    await updateUserProgress(user.uid, videoId, cappedTime, updatedProgressEntry.completed, updatedProgressEntry.lastWatched);
-
-                    if (isNowCompleted) {
-                        await awardPoints(user.uid, VIDEO_COMPLETION_POINTS);
-                        toast({
-                            title: "Video Completed!",
-                            description: `+${VIDEO_COMPLETION_POINTS} points earned!`,
-                        });
-
-                        const playlistKey = videoDetailsResult.playlistId;
-                        const playlistVideos = mockPlaylists[playlistKey].videos;
-
-                        // Check completion against the *updated* local state
-                        const allCompleted = playlistVideos.every(v => {
-                            const entry = (userProgress || {})[v.id];
-                             return (v.id === videoId) ? updatedProgressEntry.completed : (entry?.completed || false);
-                        });
-
-                        if (allCompleted) {
-                            const badgeId = PLAYLIST_COMPLETION_BADGES[playlistKey];
-                            if (badgeId && userProfile && !userProfile.badges.includes(badgeId)) {
-                                await awardBadge(user.uid, badgeId);
-                                toast({
-                                    title: `Playlist Completed: ${mockPlaylists[playlistKey].title}`,
-                                    description: `You've earned the "${badgeId.replace(/-/g, ' ')}" badge!`,
-                                });
-                                await refreshUserProfile();
-                            }
-                        } else {
-                            await refreshUserProfile(); // Refresh points even if playlist not complete
-                        }
-                    }
-                } else {
-                    updateGuestProgressEntry(videoId, cappedTime, updatedProgressEntry.completed);
-                    if (isNowCompleted) {
-                        toast({
-                            title: "Video Completed!",
-                            description: "Sign in to save progress & earn points.",
-                            duration: 7000,
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to update progress:", error);
-                toast({
-                    title: "Update Error",
-                    description: "Could not save your progress.",
-                    variant: "destructive",
-                });
-                // Rollback optimistic update
-                setUserProgress(prev => {
-                    const newState = { ...(prev || {}) };
-                    if (previousWatchedTime === 0 && !isAlreadyCompleted) {
-                        delete newState[videoId];
-                    } else {
-                        newState[videoId] = {
-                            watchedTime: previousWatchedTime,
-                            lastWatched: currentProgressState[videoId]?.lastWatched || new Date(0),
-                            completed: isAlreadyCompleted,
-                        };
-                    }
-                    return newState;
-                });
-                if (isGuest) {
-                    const currentGuestProgress = loadGuestProgress() || {};
-                    if (previousWatchedTime === 0 && !isAlreadyCompleted) {
-                        delete currentGuestProgress[videoId];
-                    } else {
-                        currentGuestProgress[videoId] = {
-                            watchedTime: previousWatchedTime,
-                            lastWatched: currentProgressState[videoId]?.lastWatched || new Date(0),
-                            completed: isAlreadyCompleted,
-                        };
-                    }
-                    saveGuestProgress(currentGuestProgress);
-                }
-            }
-        }
-    }, [user, userProgress, isGuest, userProfile, toast, refreshUserProfile]);
-
-
-    // Display loading skeleton while auth or progress data is loading
-    if (authLoading || isLoading) {
-        return (
-        <div className="space-y-8 mt-6 animate-pulse">
-            {/* Intro Skeleton */}
-            <div className="space-y-2 mb-8">
-                <Skeleton className="h-8 w-1/2 rounded-md" />
-                <Skeleton className="h-4 w-3/4 rounded-md" />
-            </div>
-            {/* Tabs Skeleton */}
-            <Skeleton className="h-10 w-full md:w-1/2 rounded-md mb-6" />
-            {/* Content Area Skeleton */}
-            <Card className="overflow-hidden">
-            <CardHeader>
-                <Skeleton className="h-6 w-1/3 rounded" />
-                <Skeleton className="h-4 w-1/2 rounded" />
-            </CardHeader>
-            <CardContent className="p-0">
-                <div className="flex flex-col md:flex-row">
-                    {/* Video Player Skeleton */}
-                    <div className="w-full md:flex-grow aspect-video bg-muted flex items-center justify-center">
-                        <PlayCircle className="h-16 w-16 text-muted-foreground/30" />
-                    </div>
-                    {/* Playlist Skeleton */}
-                    <div className="w-full md:w-80 lg:w-96 p-4 space-y-3 border-t md:border-t-0 md:border-l">
-                        <Skeleton className="h-16 w-full rounded" />
-                        <Skeleton className="h-16 w-full rounded" />
-                        <Skeleton className="h-16 w-full rounded" />
-                        <Skeleton className="h-16 w-full rounded" />
-                    </div>
+      {/* Learning Topics Section */}
+      <section>
+        <h2 className="text-3xl font-semibold text-center mb-8">
+          Choose Your Learning Path
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {learningTopics.map((topic) => (
+            <Card key={topic.id} className={`overflow-hidden transition-transform hover:scale-[1.02] hover:shadow-lg ${topic.borderColor}`}>
+              <CardHeader className={`p-6 ${topic.bgColor}`}>
+                <div className="flex items-center gap-4">
+                   <div className={`p-3 rounded-full bg-background border ${topic.borderColor}`}>
+                     <topic.icon className={`h-8 w-8 ${topic.color}`} />
+                   </div>
+                   <CardTitle className={`text-2xl font-semibold ${topic.color}`}>{topic.title}</CardTitle>
                 </div>
-            </CardContent>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <CardDescription className="text-base text-muted-foreground min-h-[70px]">
+                  {topic.description}
+                </CardDescription>
+                <Button variant="default" className="w-full group" asChild>
+                  <Link href={topic.link}>
+                    Learn {topic.title} with Videos
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              </CardContent>
             </Card>
+          ))}
         </div>
-        );
-    }
+      </section>
 
-    // Display welcome/content for both logged-in and guest users
-    return (
-        <div className="animate-fadeIn space-y-8 mt-6">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
-                    {isGuest ? "Welcome, Guest Learner!" : `Your Web Development Journey, ${userProfile?.displayName || 'Learner'}`}
-                </h1>
-                <p className="text-muted-foreground">
-                    {isGuest
-                        ? "Select a topic below (HTML, CSS, or JavaScript) to start learning. Your progress will be saved locally in this browser. Sign in to save permanently and earn rewards!"
-                        : "Select a topic below to continue where you left off or start a new one. Keep learning to earn points and badges!"}
-                </p>
-                {isGuest && (
-                    <Button asChild size="sm" className="mt-3">
-                        <Link href="/auth">Sign In / Register to Save Progress</Link>
-                    </Button>
-                )}
-            </div>
+      {/* Optional: Add more sections like testimonials, features, etc. */}
 
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PlaylistType)} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-card border">
-                    {Object.values(mockPlaylists).map((playlist) => (
-                        <TabsTrigger
-                        key={playlist.id}
-                        value={playlist.id}
-                        className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0"
-                        >
-                        <playlist.icon className="h-4 w-4 mr-2" />
-                        {playlist.id.toUpperCase()}
-                        </TabsTrigger>
-                    ))}
-                </TabsList>
-
-
-                {/* Tab Content */}
-                {Object.values(mockPlaylists).map((playlist) => (
-                <TabsContent key={playlist.id} value={playlist.id} className="mt-0 pt-0 animate-fadeIn">
-                    <LearningContent
-                    playlist={playlist}
-                    userProgress={userProgress || {}} // Pass loaded progress (could be guest or user)
-                    onProgressUpdate={handleProgressUpdate}
-                    initialVideoId={activeTab === playlist.id ? initialVideoInfo.videoId : null} // Pass initial video ID only if the tab matches
-                    initialStartTime={activeTab === playlist.id ? initialVideoInfo.startTime : 0} // Pass initial time only if the tab matches
-                    />
-                </TabsContent>
-                ))}
-            </Tabs>
-        </div>
-    );
-}
-
-// Wrap the main content component with Suspense
-export default function Home() {
-    return (
-        <Suspense fallback={<HomePageSkeleton />}>
-            <HomePageContent />
-        </Suspense>
-    );
-}
-
-
-// Skeleton component to show while waiting for Suspense boundary
-function HomePageSkeleton() {
-     return (
-      <div className="space-y-8 mt-6 animate-pulse">
-        {/* Intro Skeleton */}
-        <div className="space-y-2 mb-8">
-            <Skeleton className="h-8 w-1/2 rounded-md" />
-            <Skeleton className="h-4 w-3/4 rounded-md" />
-        </div>
-        {/* Tabs Skeleton */}
-        <Skeleton className="h-10 w-full md:w-1/2 rounded-md mb-6" />
-         {/* Content Area Skeleton */}
-        <Card className="overflow-hidden">
-          <CardHeader>
-              <Skeleton className="h-6 w-1/3 rounded" />
-              <Skeleton className="h-4 w-1/2 rounded" />
-          </CardHeader>
-          <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row">
-                  {/* Video Player Skeleton */}
-                  <div className="w-full md:flex-grow aspect-video bg-muted flex items-center justify-center">
-                     <PlayCircle className="h-16 w-16 text-muted-foreground/30" />
-                  </div>
-                  {/* Playlist Skeleton */}
-                  <div className="w-full md:w-80 lg:w-96 p-4 space-y-3 border-t md:border-t-0 md:border-l">
-                      <Skeleton className="h-16 w-full rounded" />
-                      <Skeleton className="h-16 w-full rounded" />
-                      <Skeleton className="h-16 w-full rounded" />
-                      <Skeleton className="h-16 w-full rounded" />
-                  </div>
-              </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    </div>
+  );
 }
