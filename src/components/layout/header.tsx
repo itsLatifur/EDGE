@@ -1,11 +1,10 @@
-
 'use client';
 
 import Link from 'next/link';
-import { Code, LogIn, LogOut, UserCircle, Star } from 'lucide-react';
+import { Code, LogIn, LogOut, UserCircle, Star, UserCheck, UserX } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context'; // Use the updated context
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -16,23 +15,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+// Remove direct firebase imports, use context method
+// import { signOut } from 'firebase/auth';
+// import { auth } from '@/lib/firebase/config';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation'; // Use Next.js router
+import { useRouter } from 'next/navigation';
 
 export default function Header() {
-  const { user, userProfile, loading } = useAuth();
-  const router = useRouter(); // Get router instance
+  // Use updated context values
+  const { user, userProfile, isGuest, loading, signOutUser } = useAuth();
+  const router = useRouter();
 
   const handleSignOut = async () => {
-    try {
-      await signOut(auth);
-      router.push('/'); // Redirect to home page after sign out
-    } catch (error) {
-      console.error("Error signing out: ", error);
-      // Handle error (e.g., show toast notification)
-    }
+    await signOutUser(); // Use the context method
+    router.push('/'); // Redirect to home page after sign out
   };
 
   const getInitials = (name: string | null | undefined): string => {
@@ -55,22 +51,25 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Gamification/Points Display */}
-         {user && userProfile && !loading && (
+        {/* Gamification/Points Display - Only show for logged-in users */}
+         {!isGuest && userProfile && !loading && (
             <div className="flex items-center gap-1 mr-4 text-sm font-medium text-amber-500 dark:text-amber-400">
                 <Star className="h-4 w-4 fill-current" />
                 <span>{userProfile.points} pts</span>
             </div>
          )}
-         {loading && <Skeleton className="h-6 w-16 mr-4 rounded-md" /> }
+         {/* Show skeleton only if loading and not guest */}
+         {loading && !isGuest && <Skeleton className="h-6 w-16 mr-4 rounded-md" /> }
 
 
         {/* Auth Section */}
         <div className="flex items-center gap-4">
            <ThemeToggle />
            {loading ? (
-             <Skeleton className="h-10 w-10 rounded-full" />
-           ) : user ? (
+             // Generic Skeleton for loading state
+             <Skeleton className="h-10 w-24 rounded-md" />
+           ) : !isGuest && user ? (
+             // Logged-in User Dropdown
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -93,7 +92,7 @@ export default function Header() {
                 <DropdownMenuSeparator />
                  <DropdownMenuItem onClick={() => router.push('/profile')}>
                     <UserCircle className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                    <span>Profile & Progress</span>
                  </DropdownMenuItem>
                  {/* Add other menu items like Settings, etc. */}
                  <DropdownMenuSeparator />
@@ -104,10 +103,11 @@ export default function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
            ) : (
+             // Guest User - Show Sign In Button
              <Button asChild variant="outline" size="sm">
                 <Link href="/auth">
                  <LogIn className="mr-2 h-4 w-4" />
-                 Sign In
+                 Sign In / Register
                 </Link>
               </Button>
            )}

@@ -5,17 +5,21 @@ export interface UserProfile {
   displayName: string;
   points: number;
   badges: string[]; // Array of badge identifiers (e.g., 'html-basics-completed')
-  createdAt: Date;
+  createdAt: Date; // Use JS Date object in the application
   // Add other profile fields as needed
 }
 
-export interface UserProgress {
-    [videoId: string]: {
-        watchedTime: number;
-        lastWatched: Date | any; // Allow Firestore Timestamp type
-        completed: boolean;
-    }
+export interface UserProgressEntry {
+    watchedTime: number;
+    lastWatched: Date; // Consistently use JS Date object in application logic
+    completed: boolean;
 }
+
+export interface UserProgress {
+    [videoId: string]: UserProgressEntry;
+}
+
+// --- Content Structure ---
 
 export interface ContentItem {
   id: string;
@@ -34,4 +38,3 @@ export interface Playlist {
   videos: ContentItem[];
   icon: React.ElementType; // Icon component
 }
-

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState, useEffect, useCallback} from 'react';
@@ -7,14 +6,21 @@ import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/compo
 import {Skeleton} from '@/components/ui/skeleton';
 import LearningContent from '@/components/learning-content';
 import {useToast} from '@/hooks/use-toast';
-import { PlayCircle, Code, Palette, Zap, Loader2 } from 'lucide-react';
+import { PlayCircle, Code, Palette, Zap, Loader2, User } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
-import { getUserProgress, updateUserProgress, awardPoints, awardBadge } from '@/services/user-progress';
+import {
+    getUserProgress,
+    updateUserProgress,
+    awardPoints,
+    awardBadge,
+    loadGuestProgress,
+    updateGuestProgressEntry
+} from '@/services/user-progress';
 import type { UserProgress, ContentItem, Playlist, PlaylistType } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
-// Mock data structure improvement
+// Mock data structure improvement (remains the same)
 const mockPlaylists: Record<PlaylistType, Playlist> = {
   html: {
     id: 'html',
@@ -57,7 +63,7 @@ const mockPlaylists: Record<PlaylistType, Playlist> = {
   },
 };
 
-// Helper function to find video details across all playlists
+// Helper function to find video details across all playlists (remains the same)
 const findVideoDetails = (videoId: string): ContentItem | undefined => {
   for (const key in mockPlaylists) {
     const playlist = mockPlaylists[key as PlaylistType];
@@ -67,7 +73,7 @@ const findVideoDetails = (videoId: string): ContentItem | undefined => {
   return undefined;
 }
 
-// Define Points/Badges structure
+// Define Points/Badges structure (remains the same)
 const VIDEO_COMPLETION_POINTS = 10;
 const PLAYLIST_COMPLETION_BADGES: Record<PlaylistType, string> = {
     html: 'html-master',
@@ -77,141 +83,191 @@ const PLAYLIST_COMPLETION_BADGES: Record<PlaylistType, string> = {
 
 
 export default function Home() {
-  const { user, userProfile, loading: authLoading, refreshUserProfile } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, userProfile, isGuest, loading: authLoading, refreshUserProfile } = useAuth();
+  const [isLoading, setIsLoading] = useState(true); // Tracks progress loading specifically
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [activeTab, setActiveTab] = useState<PlaylistType>('html');
   const { toast } = useToast();
 
-  // Fetch user progress when user logs in or changes
+  // Fetch user progress (Firestore or Local Storage)
   useEffect(() => {
     const fetchProgress = async () => {
-      if (user) {
-        setIsLoading(true);
-        try {
-          const progress = await getUserProgress(user.uid);
-          setUserProgress(progress || {}); // Use empty object if null
-        } catch (error) {
-          console.error("Failed to fetch user progress:", error);
-          toast({
-            title: "Progress Load Error",
-            description: "Could not load your learning progress.",
-            variant: "destructive",
-          });
-          setUserProgress({}); // Fallback to empty progress on error
-        } finally {
-          setIsLoading(false);
+      setIsLoading(true); // Start loading progress data
+      let progressData: UserProgress | null = null;
+      try {
+        if (!isGuest && user) {
+          console.log("Fetching Firestore progress for user:", user.uid);
+          progressData = await getUserProgress(user.uid);
+        } else {
+          console.log("Loading guest progress from local storage");
+          progressData = loadGuestProgress();
         }
-      } else {
-        // User logged out, reset progress and loading state
-        setUserProgress(null);
-        setIsLoading(false); // No data to load if not logged in
+        setUserProgress(progressData || {}); // Use empty object if null/no progress found
+      } catch (error) {
+        console.error("Failed to fetch user progress:", error);
+        toast({
+          title: "Progress Load Error",
+          description: "Could not load your learning progress.",
+          variant: "destructive",
+        });
+        setUserProgress({}); // Fallback to empty progress on error
+      } finally {
+        setIsLoading(false); // Finish loading progress data
       }
     };
 
-    // Don't fetch until auth state is resolved
+    // Fetch progress only when auth state is resolved and we know if user is guest or not
     if (!authLoading) {
-        fetchProgress();
+      fetchProgress();
     }
+     // Add dependencies: authLoading, isGuest, user?.uid
+  }, [authLoading, isGuest, user?.uid, toast]);
 
-  }, [user, authLoading, toast]);
 
-  // Initial welcome toast (only show if user is logged in and profile exists)
+  // Initial welcome toast (adapted for guests)
   useEffect(() => {
-     if (user && userProfile && !isLoading && !authLoading) {
-       toast({
-         title: `Welcome Back, ${userProfile.displayName}!`,
-         description: 'Ready to continue your learning journey?',
-         duration: 5000,
-       });
+     // Only show welcome *after* initial auth and progress loading is complete
+     if (!authLoading && !isLoading) {
+       if (!isGuest && userProfile) {
+         toast({
+           title: `Welcome Back, ${userProfile.displayName}!`,
+           description: 'Ready to continue your learning journey?',
+           duration: 5000,
+         });
+       } else if (isGuest) {
+          // Optional: Welcome message for guests
+           // toast({
+           //   title: "Welcome, Guest!",
+           //   description: "Sign in to save your progress permanently.",
+           //   duration: 7000,
+           // });
+       }
      }
-   }, [user, userProfile, isLoading, authLoading, toast]);
+   }, [isGuest, userProfile, authLoading, isLoading, toast]); // Depend on loading states too
 
 
   const handleProgressUpdate = useCallback(async (videoId: string, currentTime: number) => {
-     if (!user || userProgress === null) return; // Don't update if not logged in or progress not loaded
+     // Always allow progress update, but handle storage based on guest status
+     // if (userProgress === null) return; // Don't update if progress hasn't loaded yet
 
      const videoDetails = findVideoDetails(videoId);
-     if (!videoDetails) return; // Should not happen
+     if (!videoDetails) return;
 
      // Prevent updating time beyond known duration or if currentTime is invalid
-     const cappedTime = (!isNaN(currentTime)) ? Math.min(currentTime, videoDetails.duration) : (userProgress[videoId]?.watchedTime || 0);
-     const previousWatchedTime = userProgress[videoId]?.watchedTime || 0;
-     const isAlreadyCompleted = userProgress[videoId]?.completed || false;
+     const currentProgressState = userProgress || {}; // Use empty object if null
+     const cappedTime = (!isNaN(currentTime)) ? Math.min(currentTime, videoDetails.duration) : (currentProgressState[videoId]?.watchedTime || 0);
+     const previousWatchedTime = currentProgressState[videoId]?.watchedTime || 0;
+     const isAlreadyCompleted = currentProgressState[videoId]?.completed || false;
 
-     // Only update if time has progressed significantly (e.g., > 1 second)
-     if (cappedTime > previousWatchedTime) {
-         const isNowCompleted = !isAlreadyCompleted && cappedTime >= videoDetails.duration * 0.95; // Mark completed at 95%
+     // Only update if time has progressed significantly (e.g., > 1 second) or completion status changes
+     const isNowCompleted = !isAlreadyCompleted && cappedTime >= videoDetails.duration * 0.95; // Mark completed at 95%
+     const needsUpdate = (cappedTime > previousWatchedTime + 1) || (isNowCompleted && !isAlreadyCompleted);
 
-         // Optimistically update local state
+
+     if (needsUpdate) {
+         // Optimistically update local state first for immediate UI feedback
          const updatedProgressEntry = {
              watchedTime: cappedTime,
-             lastWatched: new Date(),
+             lastWatched: new Date(), // Use JS Date for local state
              completed: isAlreadyCompleted || isNowCompleted,
          };
-         setUserProgress(prev => ({ ...prev!, [videoId]: updatedProgressEntry }));
-
+         setUserProgress(prev => ({ ...(prev || {}), [videoId]: updatedProgressEntry }));
 
          try {
-             // Update Firestore
-             await updateUserProgress(user.uid, videoId, cappedTime, updatedProgressEntry.completed);
+             if (!isGuest && user) {
+                 // --- Logged-in User: Update Firestore ---
+                 await updateUserProgress(user.uid, videoId, cappedTime, updatedProgressEntry.completed, updatedProgressEntry.lastWatched);
 
-             // Award points/badge if newly completed
-             if (isNowCompleted) {
-                 await awardPoints(user.uid, VIDEO_COMPLETION_POINTS);
-                 toast({
-                     title: "Video Completed!",
-                     description: `+${VIDEO_COMPLETION_POINTS} points earned!`,
-                 });
+                 // Award points/badge if newly completed (only for logged-in users)
+                 if (isNowCompleted) {
+                     await awardPoints(user.uid, VIDEO_COMPLETION_POINTS);
+                     toast({
+                         title: "Video Completed!",
+                         description: `+${VIDEO_COMPLETION_POINTS} points earned!`,
+                     });
 
-                 // Check for playlist completion
-                 const playlistKey = Object.keys(mockPlaylists).find(key =>
-                    mockPlaylists[key as PlaylistType].videos.some(v => v.id === videoId)
-                 ) as PlaylistType | undefined;
+                     // Check for playlist completion
+                     const playlistKey = Object.keys(mockPlaylists).find(key =>
+                         mockPlaylists[key as PlaylistType].videos.some(v => v.id === videoId)
+                     ) as PlaylistType | undefined;
 
-                 if (playlistKey) {
-                     const playlistVideos = mockPlaylists[playlistKey].videos;
-                     const allCompleted = playlistVideos.every(v =>
-                        // Check the updated local state or the potentially updated Firestore data
-                         (userProgress[v.id]?.completed || (v.id === videoId && updatedProgressEntry.completed))
-                     );
+                     if (playlistKey) {
+                         const playlistVideos = mockPlaylists[playlistKey].videos;
+                         // Check against the potentially updated state `userProgress` AFTER the optimistic update
+                         const allCompleted = playlistVideos.every(v =>
+                             userProgress?.[v.id]?.completed || (v.id === videoId && updatedProgressEntry.completed)
+                         );
 
-                     if (allCompleted) {
-                         const badgeId = PLAYLIST_COMPLETION_BADGES[playlistKey];
-                         if (badgeId && !userProfile?.badges.includes(badgeId)) {
-                             await awardBadge(user.uid, badgeId);
-                              toast({
-                                  title: `Playlist Completed: ${mockPlaylists[playlistKey].title}`,
-                                  description: `You've earned the "${badgeId.replace(/-/g, ' ')}" badge!`,
-                              });
-                              // Refresh user profile to show new badge/points immediately in header
+                         if (allCompleted) {
+                             const badgeId = PLAYLIST_COMPLETION_BADGES[playlistKey];
+                             // Ensure userProfile is available before checking badges
+                             if (badgeId && userProfile && !userProfile.badges.includes(badgeId)) {
+                                 await awardBadge(user.uid, badgeId);
+                                 toast({
+                                     title: `Playlist Completed: ${mockPlaylists[playlistKey].title}`,
+                                     description: `You've earned the "${badgeId.replace(/-/g, ' ')}" badge!`,
+                                 });
+                                 // Refresh user profile to show new badge/points immediately
+                                 await refreshUserProfile();
+                             }
+                         } else {
+                              // Refresh profile anyway if points were awarded
                               await refreshUserProfile();
                          }
                      } else {
-                         // Refresh profile anyway to show points update
-                          await refreshUserProfile();
+                         // Refresh profile anyway if points were awarded
+                         await refreshUserProfile();
                      }
-                 } else {
-                    // Refresh profile anyway to show points update
-                    await refreshUserProfile();
+                 }
+             } else {
+                 // --- Guest User: Update Local Storage ---
+                 updateGuestProgressEntry(videoId, cappedTime, updatedProgressEntry.completed);
+
+                 // Optional: Toast for guest video completion (no points/badges)
+                 if (isNowCompleted) {
+                      toast({
+                          title: "Video Completed!",
+                          description: "Sign in to save progress & earn points.",
+                          duration: 7000, // Longer duration for guests
+                      });
                  }
              }
          } catch (error) {
-             console.error("Failed to update progress or award points/badge:", error);
+             console.error("Failed to update progress:", error);
              toast({
                  title: "Update Error",
-                 description: "Could not save your progress or award points.",
+                 description: "Could not save your progress.",
                  variant: "destructive",
              });
-             // Optionally rollback optimistic update here if needed
-             setUserProgress(prev => ({ ...prev!, [videoId]: {
-                 watchedTime: previousWatchedTime,
-                 lastWatched: userProgress[videoId]?.lastWatched || new Date(), // Keep old date or use current
-                 completed: isAlreadyCompleted,
-             }}));
+             // Rollback optimistic update for the specific video entry
+              setUserProgress(prev => {
+                  const newState = { ...(prev || {}) };
+                  if (previousWatchedTime === 0 && !isAlreadyCompleted) {
+                     // If it was the first update, remove the entry
+                     delete newState[videoId];
+                  } else {
+                      // Otherwise, revert to previous state
+                      newState[videoId] = {
+                          watchedTime: previousWatchedTime,
+                          lastWatched: currentProgressState[videoId]?.lastWatched || new Date(), // Keep old date or use current
+                          completed: isAlreadyCompleted,
+                      };
+                  }
+                  return newState;
+              });
+              // Also attempt to rollback local storage if guest
+              if (isGuest) {
+                 if (previousWatchedTime === 0 && !isAlreadyCompleted) {
+                     const currentGuestProgress = loadGuestProgress() || {};
+                     delete currentGuestProgress[videoId];
+                     saveGuestProgress(currentGuestProgress);
+                 } else {
+                      updateGuestProgressEntry(videoId, previousWatchedTime, isAlreadyCompleted);
+                 }
+              }
          }
      }
-  }, [user, userProgress, userProfile?.badges, toast, refreshUserProfile]); // Add refreshUserProfile dependency
+  }, [user, userProgress, isGuest, userProfile, toast, refreshUserProfile]);
 
 
    // Display loading skeleton while auth or progress data is loading
@@ -251,39 +307,23 @@ export default function Home() {
     );
   }
 
-  // Display message if user is not logged in
-  if (!user) {
-     return (
-         <div className="animate-fadeIn space-y-8 mt-16 text-center">
-            <Card className="max-w-lg mx-auto shadow-lg">
-                <CardHeader>
-                    <CardTitle className="text-2xl font-bold">Welcome to Self-Learn!</CardTitle>
-                    <CardDescription>
-                        Sign in or create an account to save your progress, earn points, and unlock badges as you master web development.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <Zap className="h-16 w-16 text-primary mx-auto mb-4" />
-                     <p className="text-muted-foreground mb-6">
-                        Interactive tutorials in HTML, CSS, and JavaScript await you.
-                     </p>
-                     <Button asChild size="lg">
-                         <Link href="/auth">Get Started - Sign In / Register</Link>
-                     </Button>
-                </CardContent>
-            </Card>
-         </div>
-     );
-  }
-
-  // Main content for logged-in users
+  // Display welcome/content for both logged-in and guest users
   return (
     <div className="animate-fadeIn space-y-8 mt-6">
        <div className="mb-8">
-           <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">Your Web Development Journey</h1>
+           <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
+                {isGuest ? "Welcome, Guest Learner!" : `Your Web Development Journey, ${userProfile?.displayName || 'Learner'}`}
+           </h1>
            <p className="text-muted-foreground">
-               Select a topic below (HTML, CSS, or JavaScript) to start learning or continue where you left off. Videos are curated to guide you step-by-step.
+               {isGuest
+                    ? "Select a topic below (HTML, CSS, or JavaScript) to start learning. Your progress will be saved locally in this browser. Sign in to save permanently and earn rewards!"
+                    : "Select a topic below to continue where you left off or start a new one. Keep learning to earn points and badges!"}
            </p>
+           {isGuest && (
+               <Button asChild size="sm" className="mt-3">
+                  <Link href="/auth">Sign In / Register to Save Progress</Link>
+               </Button>
+           )}
        </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PlaylistType)} className="w-full">
@@ -306,9 +346,9 @@ export default function Home() {
           <TabsContent key={playlist.id} value={playlist.id} className="mt-0 pt-0 animate-fadeIn">
             <LearningContent
               playlist={playlist}
-              userProgress={userProgress || {}} // Pass empty object if null
+              userProgress={userProgress || {}} // Pass loaded progress (could be guest or user)
               onProgressUpdate={handleProgressUpdate}
-              currentTab={activeTab} // Pass active tab for potential optimizations in LearningContent
+              currentTab={activeTab}
             />
           </TabsContent>
         ))}
@@ -316,4 +356,3 @@ export default function Home() {
     </div>
   );
 }
-

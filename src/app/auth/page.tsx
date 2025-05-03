@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -16,9 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Github } from 'lucide-react'; // Assuming you might add GitHub login later
+import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/auth-context'; // Import useAuth
 
-// Zod Schemas for validation
+// Zod Schemas for validation (remain the same)
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
@@ -30,7 +30,7 @@ const registerSchema = z.object({
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match.",
-  path: ['confirmPassword'], // Set error path to confirmPassword field
+  path: ['confirmPassword'],
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -39,6 +39,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 export default function AuthPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { signIn } = useAuth(); // Get signIn function from context
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -55,7 +56,9 @@ export default function AuthPage() {
   const handleLogin = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      // Use the signIn context method to handle profile fetch and progress merge
+      await signIn(userCredential.user);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
       router.push('/'); // Redirect to home page
     } catch (error: any) {
@@ -76,20 +79,18 @@ export default function AuthPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
-      // Create user profile in Firestore
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.email?.split('@')[0] || 'Learner', // Default display name
-        points: 0,
-        badges: [],
-        createdAt: Timestamp.now(), // Use Firestore Timestamp
-      });
+      // The signIn method now handles profile creation/fetching and progress merging
+      await signIn(user);
 
-       // Also create an empty progress document
+      // Note: Firestore user document creation is now handled within the `signIn` logic (in AuthProvider)
+      // We might still need to explicitly create the progress doc if signIn doesn't.
+      // Let's assume signIn handles profile, check if progress needs creation.
       const progressDocRef = doc(db, 'userProgress', user.uid);
-      await setDoc(progressDocRef, {}); // Create an empty map
+      const progressSnap = await getDoc(progressDocRef);
+      if (!progressSnap.exists()) {
+          await setDoc(progressDocRef, {}); // Create empty progress doc if needed
+      }
+
 
       toast({ title: 'Registration Successful', description: 'Welcome to Self-Learn!' });
       router.push('/'); // Redirect to home page
@@ -110,30 +111,21 @@ export default function AuthPage() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+      // Use the signIn context method to handle profile fetch/creation and progress merge
+      await signIn(result.user);
 
-      // Check if user exists in Firestore, create profile if not
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Learner',
-          points: 0,
-          badges: [],
-          createdAt: Timestamp.now(),
-        });
-        // Also create empty progress doc
-        const progressDocRef = doc(db, 'userProgress', user.uid);
-        await setDoc(progressDocRef, {});
+      // Ensure progress doc exists (similar check as in registration)
+      const progressDocRef = doc(db, 'userProgress', result.user.uid);
+      const progressSnap = await getDoc(progressDocRef);
+      if (!progressSnap.exists()) {
+          await setDoc(progressDocRef, {});
       }
 
       toast({ title: 'Signed in with Google', description: 'Welcome!' });
       router.push('/');
     } catch (error: any) {
       console.error("Google Sign-In Error:", error);
+      // Check for specific error codes if needed (e.g., account-exists-with-different-credential)
       toast({
         title: 'Google Sign-In Failed',
         description: error.message || 'Could not sign in with Google.',
@@ -158,7 +150,7 @@ export default function AuthPage() {
           <Card>
             <CardHeader>
               <CardTitle>Login</CardTitle>
-              <CardDescription>Access your learning dashboard.</CardDescription>
+              <CardDescription>Access your learning dashboard & saved progress.</CardDescription>
             </CardHeader>
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(handleLogin)}>
@@ -238,7 +230,7 @@ export default function AuthPage() {
           <Card>
             <CardHeader>
               <CardTitle>Register</CardTitle>
-              <CardDescription>Create your account to start learning.</CardDescription>
+              <CardDescription>Create an account to save progress & earn rewards.</CardDescription>
             </CardHeader>
              <Form {...registerForm}>
                <form onSubmit={registerForm.handleSubmit(handleRegister)}>
