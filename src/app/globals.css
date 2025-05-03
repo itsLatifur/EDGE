@@ -1,77 +1,79 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 210 20% 98%; /* Light Gray */
-    --foreground: 210 29% 29%; /* Dark Blue */
-    --card: 210 20% 98%;
-    --card-foreground: 210 29% 29%;
-    --popover: 210 20% 98%;
-    --popover-foreground: 210 29% 29%;
-    --primary: 210 29% 29%; /* Dark Blue */
-    --primary-foreground: 0 0% 100%; /* White for contrast on dark blue */
-    --secondary: 210 17% 93%; /* Light Gray slightly darker */
-    --secondary-foreground: 210 29% 29%;
-    --muted: 210 17% 93%;
-    --muted-foreground: 210 29% 45%;
-    --accent: 195 53% 79%; /* Lighter Teal for subtle accents */
-    --accent-foreground: 195 53% 40%; /* Teal */
+    --background: 0 0% 100%; /* Pure White */
+    --foreground: 224 71% 4%; /* Very Dark Blue */
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+    --primary: 208 95% 53%; /* Brighter Blue */
+    --primary-foreground: 0 0% 100%; /* White */
+    --secondary: 215 28% 96%; /* Very Light Gray-Blue */
+    --secondary-foreground: 224 71% 15%; /* Darker Blue */
+    --muted: 215 28% 93%; /* Light Gray-Blue */
+    --muted-foreground: 215 20% 50%; /* Medium Gray-Blue */
+    --accent: 210 40% 98%; /* Very Light Blue accent background */
+    --accent-foreground: 208 95% 45%; /* Slightly Darker Blue for accent text */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 210 17% 88%; /* Slightly darker border */
-    --input: 210 17% 88%;
-    --ring: 195 53% 40%; /* Teal */
+    --border: 215 20% 90%; /* Lighter Border */
+    --input: 215 20% 88%; /* Input Border */
+    --ring: 208 95% 53%; /* Brighter Blue Ring */
     --radius: 0.5rem;
-    --chart-1: 195 53% 40%;
-    --chart-2: 210 29% 40%;
-    --chart-3: 195 53% 60%;
-    --chart-4: 210 29% 60%;
-    --chart-5: 195 53% 80%;
-    --sidebar-background: 210 20% 96%;
-    --sidebar-foreground: 210 29% 29%;
-    --sidebar-primary: 195 53% 40%;
+    --chart-1: 208 95% 53%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 40 95% 60%;
+    --chart-4: 280 70% 65%;
+    --chart-5: 0 80% 70%;
+    --sidebar-background: 215 28% 97%; /* Slightly off-white sidebar */
+    --sidebar-foreground: 224 71% 10%;
+    --sidebar-primary: 208 95% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 17% 90%;
-    --sidebar-accent-foreground: 210 29% 20%;
-    --sidebar-border: 210 17% 85%;
-    --sidebar-ring: 195 53% 40%;
+    --sidebar-accent: 208 95% 92%; /* Lighter blue sidebar accent */
+    --sidebar-accent-foreground: 208 95% 40%;
+    --sidebar-border: 215 20% 85%;
+    --sidebar-ring: 208 95% 53%;
   }
 
   .dark {
-    --background: 210 29% 15%; /* Darker Blue for dark mode */
-    --foreground: 210 20% 98%; /* Light Gray */
-    --card: 210 29% 20%;
-    --card-foreground: 210 20% 98%;
-    --popover: 210 29% 15%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 210 20% 98%; /* Light Gray for primary in dark mode */
-    --primary-foreground: 210 29% 15%; /* Dark Blue for contrast */
-    --secondary: 210 29% 25%; /* Slightly lighter dark blue */
-    --secondary-foreground: 210 20% 98%;
-    --muted: 210 29% 25%;
-    --muted-foreground: 210 20% 70%;
-    --accent: 195 53% 60%; /* Brighter Teal for dark mode */
-    --accent-foreground: 195 53% 90%; /* Lighter Teal for contrast */
-    --destructive: 0 62.8% 30.6%;
+    --background: 224 71% 10%; /* Very Dark Blue */
+    --foreground: 210 40% 98%; /* Almost White */
+    --card: 224 71% 14%; /* Slightly Lighter Dark Blue */
+    --card-foreground: 210 40% 98%;
+    --popover: 224 71% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 208 95% 58%; /* Vibrant Blue */
+    --primary-foreground: 224 71% 5%; /* Very Dark Blue for contrast */
+    --secondary: 224 71% 18%; /* Darker Shade */
+    --secondary-foreground: 210 40% 94%; /* Lighter Foreground */
+    --muted: 224 71% 22%; /* Muted Dark Shade */
+    --muted-foreground: 215 20% 65%; /* Lighter Muted Text */
+    --accent: 224 71% 25%; /* Dark Accent Background */
+    --accent-foreground: 208 95% 70%; /* Bright Blue Accent Text */
+    --destructive: 0 62.8% 50.6%; /* Brighter Red */
     --destructive-foreground: 0 0% 98%;
-    --border: 210 29% 30%; /* Darker border */
-    --input: 210 29% 30%;
-    --ring: 195 53% 60%; /* Teal */
-    --chart-1: 195 53% 60%;
-    --chart-2: 210 20% 70%;
-    --chart-3: 195 53% 40%;
-    --chart-4: 210 20% 50%;
-    --chart-5: 195 53% 20%;
-    --sidebar-background: 210 29% 10%;
-    --sidebar-foreground: 210 20% 98%;
-    --sidebar-primary: 195 53% 60%;
-    --sidebar-primary-foreground: 210 29% 10%;
-    --sidebar-accent: 210 29% 20%;
-    --sidebar-accent-foreground: 210 20% 98%;
-    --sidebar-border: 210 29% 25%;
-    --sidebar-ring: 195 53% 60%;
+    --border: 224 71% 25%; /* Dark Border */
+    --input: 224 71% 28%; /* Input Border */
+    --ring: 208 95% 58%; /* Vibrant Blue Ring */
+    /* chart colors remain similar or slightly adjusted for dark mode */
+    --chart-1: 208 95% 58%;
+    --chart-2: 160 70% 50%;
+    --chart-3: 40 90% 65%;
+    --chart-4: 280 75% 70%;
+    --chart-5: 0 75% 75%;
+    --sidebar-background: 224 71% 8%; /* Even Darker Sidebar */
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 208 95% 58%;
+    --sidebar-primary-foreground: 224 71% 5%;
+    --sidebar-accent: 224 71% 20%; /* Darker Sidebar Accent */
+    --sidebar-accent-foreground: 208 95% 75%;
+    --sidebar-border: 224 71% 22%;
+    --sidebar-ring: 208 95% 58%;
   }
 }
 
@@ -80,7 +82,64 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans);
+    @apply bg-background text-foreground transition-colors duration-200; /* Added transition */
+    font-family: var(--font-sans), sans-serif; /* Ensure fallback */
+    -webkit-font-smoothing: antialiased; /* Smoother fonts on WebKit */
+    -moz-osx-font-smoothing: grayscale; /* Smoother fonts on Firefox */
+  }
+
+  /* Improve focus visibility globally */
+  *:focus-visible {
+      @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
+
+/* Custom scrollbar styling */
+@layer utilities {
+  /* For Webkit browsers (Chrome, Safari) */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/50 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/50 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/70;
+  }
+
+  /* For Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) hsl(var(--muted) / 0.5);
+  }
+}
+
+/* Animation Overrides/Additions */
+@layer utilities {
+    .animate-fadeIn {
+        animation: fadeIn 0.5s ease-out forwards;
+    }
+     .animate-pulseFast {
+         animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+     }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Keyframes for pulseFast if not default */
+/* @keyframes pulse {
+  50% {
+    opacity: .5;
+  }
+} */
+
