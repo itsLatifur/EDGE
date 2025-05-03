@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
@@ -15,12 +14,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { ContentItem, UserProgress, Playlist } from '@/types'; // Import updated types
+import type { ContentItem, UserProgress, Playlist, UserProgressEntry } from '@/types'; // Import updated types
 
 
 interface LearningContentProps {
   playlist: Playlist; // Use the Playlist interface
-  userProgress: UserProgress;
+  userProgress: UserProgress; // Can be an empty object {} but not null
   onProgressUpdate: (videoId: string, currentTime: number) => void;
   currentTab?: string; // Keep for potential future use, but logic primarily uses playlist prop
 }
@@ -35,9 +34,9 @@ const formatTime = (seconds: number): string => {
 
 const LearningContent: React.FC<LearningContentProps> = ({
   playlist,
-  userProgress,
+  userProgress, // userProgress is guaranteed to be an object, potentially empty
   onProgressUpdate,
-  currentTab, // Keep prop, but useEffect logic now relies on `playlist`
+  currentTab,
 }) => {
   const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null);
   const [activeVideoStartTime, setActiveVideoStartTime] = useState<number>(0);
@@ -57,29 +56,35 @@ const LearningContent: React.FC<LearningContentProps> = ({
       // Find the most recently watched video within *this* playlist
       const playlistVideoIds = new Set(playlist.videos.map(v => v.id));
 
-      // Ensure userProgress is not null before accessing it
-      const relevantHistory = userProgress ? Object.entries(userProgress)
-          .filter(([videoId, data]) => playlistVideoIds.has(videoId) && data?.lastWatched instanceof Date && data.watchedTime > 0)
-          .sort(([, a], [, b]) => b.lastWatched.getTime() - a.lastWatched.getTime()) : [];
+      // userProgress is now guaranteed to be an object
+      const relevantHistory = Object.entries(userProgress)
+          .filter(([videoId, data]) =>
+              playlistVideoIds.has(videoId) &&
+              data?.lastWatched instanceof Date && // Ensure lastWatched is a Date
+              data.watchedTime >= 0 // Allow 0 watched time
+          )
+          // Convert to array of objects with videoId for easier sorting/finding
+          .map(([videoId, data]) => ({ videoId, ...data }))
+          .sort((a, b) => b.lastWatched.getTime() - a.lastWatched.getTime()); // Sort by most recent
 
 
       if (relevantHistory.length > 0) {
-          const [latestVideoId, latestData] = relevantHistory[0];
-          const videoDetails = playlist.videos.find(v => v.id === latestVideoId);
+          const latestEntry = relevantHistory[0];
+          const videoDetails = playlist.videos.find(v => v.id === latestEntry.videoId);
           // Resume if not completed (using the 'completed' flag or time check)
-          if (videoDetails && !latestData.completed && latestData.watchedTime < videoDetails.duration * 0.98) {
+          if (videoDetails && !latestEntry.completed && latestEntry.watchedTime < videoDetails.duration * 0.98) {
               videoToPlay = videoDetails;
-              startTime = latestData.watchedTime; // Update startTime
+              startTime = latestEntry.watchedTime; // Update startTime
           }
       }
 
       // If no resumable video found, find the first uncompleted in order
       if (!videoToPlay) {
           const firstUnwatched = playlist.videos.find(
-              (item) => !userProgress?.[item.id]?.completed // Check the completed flag
+              (item) => !userProgress[item.id]?.completed // Check the completed flag
           );
           videoToPlay = firstUnwatched || playlist.videos[0]; // Fallback to the very first video
-          startTime = userProgress?.[videoToPlay.id]?.watchedTime || 0; // Update startTime
+          startTime = userProgress[videoToPlay.id]?.watchedTime || 0; // Update startTime
       }
 
       setActiveVideo(videoToPlay);
@@ -93,8 +98,10 @@ const LearningContent: React.FC<LearningContentProps> = ({
     }
     lastReportedTimeRef.current = startTime; // Reset last reported time when video changes
 
-    // Only depend on playlist and userProgress (which changes on login/update)
-  }, [playlist, userProgress]); // React to changes in the playlist itself or the user's progress
+    // Depend only on the playlist ID and the userProgress object itself.
+    // Using playlist.id assumes if the ID changes, the content might have changed.
+    // Directly depending on userProgress covers updates from logins, merges, etc.
+  }, [playlist.id, userProgress]);
 
 
   // Update iframe src only when activeVideo or its specific startTime changes
@@ -140,7 +147,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
       // Restart the progress interval tracking after iframe loads
       startProgressTracking();
 
-  }, [activeVideoStartTime]); // Added missing dependency
+  }, [activeVideoStartTime]); // Added missing dependency `startProgressTracking` - Re-added startProgressTracking to dependencies
 
 
   // Function to start the progress tracking interval
@@ -205,7 +212,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const handlePlaylistItemClick = useCallback((item: ContentItem) => {
     // Only update if a different video is clicked
     if (activeVideo?.id !== item.id) {
-      const startTime = userProgress?.[item.id]?.watchedTime || 0;
+      const startTime = userProgress[item.id]?.watchedTime || 0; // Access directly, it's an object
       setActiveVideo(item);
       setActiveVideoStartTime(startTime);
       lastReportedTimeRef.current = startTime; // Reset reported time
@@ -220,19 +227,19 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
   // Memoize calculation for progress based on userProgress and item duration
   const getVideoProgress = useCallback((item: ContentItem): number => {
-      const history = userProgress?.[item.id]; // Use optional chaining
+      const history = userProgress[item.id]; // Access directly
       if (!history || !item.duration || item.duration <= 0) return 0;
       return Math.min(100, (history.watchedTime / item.duration) * 100);
   }, [userProgress]);
 
   // Memoize calculation for watched time based on userProgress
   const getWatchedTime = useCallback((itemId: string): number => {
-      return userProgress?.[itemId]?.watchedTime || 0; // Use optional chaining
+      return userProgress[itemId]?.watchedTime || 0; // Access directly
   }, [userProgress]);
 
    // Memoize completion status check
    const isVideoCompleted = useCallback((item: ContentItem): boolean => {
-     const progressData = userProgress?.[item.id];
+     const progressData = userProgress[item.id]; // Access directly
      // Check the completed flag first, then fallback to time check
      return progressData?.completed || (progressData?.watchedTime && item.duration > 0 && progressData.watchedTime >= item.duration * 0.95) || false;
   }, [userProgress]);
@@ -253,6 +260,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
   // Memoize the playlist items rendering logic
    const renderedPlaylistItems = useMemo(() => {
+      if (!playlist?.videos) return []; // Add guard for potentially undefined playlist or videos
       return playlist.videos.map((item, index) => {
          const progress = getVideoProgress(item);
          const watchedTime = getWatchedTime(item.id);
@@ -369,7 +377,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
            </TooltipProvider>
          );
        });
-   }, [playlist.videos, activeVideo?.id, getVideoProgress, getWatchedTime, isVideoCompleted, getThumbnailHint, handlePlaylistItemClick, handleIframeLoad]); // Added isVideoCompleted
+   }, [playlist?.videos, activeVideo?.id, getVideoProgress, getWatchedTime, isVideoCompleted, getThumbnailHint, handlePlaylistItemClick, handleIframeLoad]); // Added handleIframeLoad
 
 
   return (
@@ -379,10 +387,11 @@ const LearningContent: React.FC<LearningContentProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div className="mb-2 sm:mb-0">
                 <CardTitle className="text-lg font-semibold text-primary flex items-center gap-2">
-                    <playlist.icon className="h-5 w-5" /> {playlist.title}
+                   {playlist?.icon && <playlist.icon className="h-5 w-5" />} {/* Add safe check */}
+                   {playlist?.title || 'Playlist'} {/* Add safe check */}
                 </CardTitle>
                 <CardDescription className="text-sm mt-1">
-                    {playlist.videos.length} videos ・ {playlist.description}
+                    {(playlist?.videos?.length || 0)} videos ・ {playlist?.description || ''} {/* Add safe check */}
                 </CardDescription>
             </div>
              {/* Optional: Maybe add overall progress for the playlist here */}
@@ -403,7 +412,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
               </div>
             )}
             {/* Placeholder when no video is selected */}
-            {!activeVideo && playlist.videos.length > 0 && (
+            {!activeVideo && (playlist?.videos?.length || 0) > 0 && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center p-4">
                   <ListVideo className="h-12 w-12 text-muted-foreground/50 mb-3" />
                   <p className="text-muted-foreground font-medium">Select a video from the playlist</p>
@@ -411,7 +420,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
               </div>
             )}
             {/* Placeholder for empty playlist */}
-            {playlist.videos.length === 0 && (
+            {(!playlist?.videos || playlist.videos.length === 0) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center p-4">
                    <ListVideo className="h-12 w-12 text-muted-foreground/50 mb-3" />
                    <p className="text-muted-foreground font-medium">No videos in this playlist yet.</p>
@@ -438,7 +447,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
           </div>
 
           {/* Playlist Area (Right on Desktop, Bottom on Mobile) */}
-          {playlist.videos.length > 0 && (
+          {(playlist?.videos?.length || 0) > 0 && (
             <div className="w-full md:w-80 lg:w-96 border-t md:border-t-0 md:border-l bg-background md:bg-muted/20 flex flex-col flex-shrink-0">
                <ScrollArea className="flex-grow h-[50vh] md:h-[calc(100vh-14rem)]"> {/* Adjusted height */}
                  <div className="p-2 space-y-1.5">

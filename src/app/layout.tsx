@@ -8,6 +8,9 @@ import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import { AuthProvider } from '@/context/auth-context'; // Import AuthProvider
 import { cn } from '@/lib/utils';
+import BackToTopButton from '@/components/back-to-top-button'; // Import BackToTopButton
+import ContinueLearningButton from '@/components/continue-learning-button'; // Import ContinueLearningButton
+
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -42,11 +45,13 @@ export default function RootLayout({
         >
           <AuthProvider> {/* Wrap content with AuthProvider */}
             <Header />
-            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 relative">
                {children}
             </main>
             <Footer />
             <Toaster />
+            <ContinueLearningButton /> {/* Add Continue Learning Button */}
+            <BackToTopButton /> {/* Add Back to Top Button */}
           </AuthProvider> {/* Close AuthProvider */}
         </ThemeProvider>
       </body>

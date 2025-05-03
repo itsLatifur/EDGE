@@ -15,7 +15,25 @@ export const loadGuestProgress = (): UserProgress | null => {
         // Ensure lastWatched are Date objects
         for (const videoId in progress) {
              if (progress[videoId].lastWatched && !(progress[videoId].lastWatched instanceof Date)) {
-                progress[videoId].lastWatched = new Date(progress[videoId].lastWatched);
+                // Attempt conversion from ISO string or number (timestamp)
+                let dateValue = progress[videoId].lastWatched;
+                if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+                    const parsedDate = new Date(dateValue);
+                    // Check if parsing was successful
+                    if (!isNaN(parsedDate.getTime())) {
+                        progress[videoId].lastWatched = parsedDate;
+                    } else {
+                        console.warn(`Could not parse lastWatched date for video ${videoId} from localStorage:`, dateValue);
+                        // Fallback: Set to epoch or current time? For simplicity, keep as is or set to now
+                        progress[videoId].lastWatched = new Date(0); // Set to epoch if invalid
+                    }
+                } else {
+                     console.warn(`Invalid type for lastWatched date for video ${videoId} from localStorage:`, dateValue);
+                     progress[videoId].lastWatched = new Date(0); // Set to epoch if invalid type
+                }
+             } else if (!progress[videoId].lastWatched) {
+                 // If lastWatched is missing or null, set to epoch
+                 progress[videoId].lastWatched = new Date(0);
              }
         }
         return progress;
@@ -84,16 +102,21 @@ export const getUserProgress = async (userId: string): Promise<UserProgress | nu
                     completed: data[videoId].completed ?? false,
                  };
             } else {
-                 console.warn(`Invalid progress data format for video ${videoId} for user ${userId}`);
-                 // Optionally handle or skip invalid entries
+                 // Log a warning but still try to provide a default structure if possible
+                 console.warn(`Invalid or missing Firestore progress data format for video ${videoId}, user ${userId}. Using defaults.`);
+                 // Create a default entry if needed, or skip
+                 // progress[videoId] = { watchedTime: 0, lastWatched: new Date(0), completed: false };
             }
         }
         return progress;
+      } else {
+          // No progress doc exists, return empty object
+          return {};
       }
   } catch(error) {
       console.error(`Error fetching Firestore progress for user ${userId}:`, error);
   }
-  return null; // Or return an empty object {} if preferred
+  return null; // Return null on error
 };
 
 // Update user progress data in Firestore
@@ -107,7 +130,7 @@ export const updateUserProgress = async (
   if (!userId) return;
   const progressDocRef = doc(db, 'userProgress', userId);
   const updateData: { [key: string]: any } = {};
-  const fieldPathPrefix = `${videoId}`; // Firestore field paths don't support backticks well sometimes
+  const fieldPathPrefix = `${videoId}`; // Using videoId directly as key should be fine
 
   updateData[`${fieldPathPrefix}.watchedTime`] = watchedTime;
   // Ensure we use Firestore Timestamp when writing
@@ -115,9 +138,12 @@ export const updateUserProgress = async (
   updateData[`${fieldPathPrefix}.completed`] = isCompleted;
 
   try {
+      // Use setDoc with merge: true to create the document if it doesn't exist
+      // or update specific fields if it does.
       await setDoc(progressDocRef, updateData, { merge: true });
   } catch(error) {
        console.error(`Error updating Firestore progress for user ${userId}, video ${videoId}:`, error);
+       throw error; // Re-throw error to be handled by the caller if needed
   }
 };
 
@@ -131,37 +157,26 @@ export const mergeProgress = (firestoreProgress: UserProgress, guestProgress: Us
     const guestEntry = guestProgress[videoId];
     const firestoreEntry = firestoreProgress[videoId];
 
-    // Basic merge: prioritize the entry with the later lastWatched date
-    // Or if firestore entry doesn't exist, take guest entry
-    // Also prioritize completed status if one is completed and the other isn't
-    if (
-        !firestoreEntry ||
-        guestEntry.completed && !firestoreEntry.completed ||
-        (!firestoreEntry.completed && guestEntry.lastWatched.getTime() > firestoreEntry.lastWatched.getTime())
-        ) {
+    // Ensure guest entry's lastWatched is a valid Date object
+    const guestLastWatched = guestEntry.lastWatched instanceof Date ? guestEntry.lastWatched : new Date(0); // Default to epoch if invalid
 
-         // Ensure the guest entry's lastWatched is a Date object before adding
-         merged[videoId] = {
-            ...guestEntry,
-            lastWatched: guestEntry.lastWatched instanceof Date ? guestEntry.lastWatched : new Date(guestEntry.lastWatched)
-         };
+    // Prioritize completed status: If guest is complete and Firestore isn't, take guest.
+    if (guestEntry.completed && (!firestoreEntry || !firestoreEntry.completed)) {
+        merged[videoId] = { ...guestEntry, lastWatched: guestLastWatched };
+        continue; // Move to next videoId
     }
-    // If firestore entry is completed, keep it unless guest entry is somehow more recent *and* completed (unlikely)
-    else if (firestoreEntry.completed && !guestEntry.completed) {
-        // Keep firestore version
+
+    // If Firestore is complete, keep it (unless guest is also complete AND somehow more recent - unlikely needed)
+    if (firestoreEntry && firestoreEntry.completed) {
+        continue; // Keep firestore completed entry
     }
-    // If both are incomplete, take the one with the later timestamp
-    else if (!firestoreEntry.completed && !guestEntry.completed && guestEntry.lastWatched.getTime() > firestoreEntry.lastWatched.getTime()) {
-        merged[videoId] = {
-            ...guestEntry,
-            lastWatched: guestEntry.lastWatched instanceof Date ? guestEntry.lastWatched : new Date(guestEntry.lastWatched)
-         };
+
+    // If neither is complete, take the one with the later lastWatched date.
+    // Also takes guest entry if firestore entry doesn't exist.
+    if (!firestoreEntry || guestLastWatched.getTime() > firestoreEntry.lastWatched.getTime()) {
+        merged[videoId] = { ...guestEntry, lastWatched: guestLastWatched };
     }
-     // Handle case where watched time might be higher in guest but timestamp is older (less likely with current logic)
-     else if (firestoreEntry && guestEntry.watchedTime > firestoreEntry.watchedTime && guestEntry.lastWatched.getTime() <= firestoreEntry.lastWatched.getTime()) {
-         // Optionally update watched time but keep firestore timestamp?
-         // For simplicity, the current logic based on timestamp and completion is likely sufficient.
-     }
+    // If firestore timestamp is later or equal, keep the firestore entry (already in `merged`)
   }
 
   return merged;
@@ -178,39 +193,53 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
             const data = userDocSnap.data();
-             // Convert Firestore Timestamp to Date
-            const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date();
+             // Convert Firestore Timestamp to Date, handle potential undefined
+            const createdAtTimestamp = data.createdAt;
+            const createdAt = createdAtTimestamp instanceof Timestamp ? createdAtTimestamp.toDate() : new Date(); // Default to now if missing/invalid
+
             return {
-                uid: data.uid,
-                email: data.email,
-                displayName: data.displayName,
+                uid: data.uid || userId, // Ensure uid is present
+                email: data.email || '',
+                displayName: data.displayName || 'Learner',
                 points: data.points ?? 0,
-                badges: data.badges ?? [],
+                badges: Array.isArray(data.badges) ? data.badges : [], // Ensure badges is an array
                 createdAt: createdAt,
             } as UserProfile;
+        } else {
+            console.log(`Profile not found for user ${userId}, potentially a new user.`);
+            return null; // Return null if profile doesn't exist yet
         }
     } catch (error) {
          console.error(`Error fetching profile for user ${userId}:`, error);
     }
-    return null;
+    return null; // Return null on error
 }
 
 // Award points to a user
 export const awardPoints = async (userId: string, points: number): Promise<void> => {
-  if (!userId) return;
+  if (!userId || points === 0) return; // Don't update if no points
   const userDocRef = doc(db, 'users', userId);
    try {
+       // Use updateDoc which requires the document to exist.
+       // If creating profile/awarding points first time, ensure profile exists first.
        await updateDoc(userDocRef, {
            points: increment(points)
        });
+       console.log(`Awarded ${points} points to user ${userId}`);
    } catch(error) {
        console.error(`Error awarding points to user ${userId}:`, error);
+        // Consider if profile might not exist yet
+       const profile = await getUserProfile(userId);
+       if (!profile) {
+           console.warn(`Attempted to award points to non-existent profile for user ${userId}`);
+           // Optionally create profile here or handle differently
+       }
    }
 };
 
 // Award a badge to a user
 export const awardBadge = async (userId: string, badgeId: string): Promise<void> => {
-  if (!userId) return;
+  if (!userId || !badgeId) return;
   const userDocRef = doc(db, 'users', userId);
 
   try {
@@ -218,12 +247,18 @@ export const awardBadge = async (userId: string, badgeId: string): Promise<void>
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        const currentBadges = userData.badges || []; // Handle case where badges array might not exist
+        const currentBadges = Array.isArray(userData.badges) ? userData.badges : []; // Ensure it's an array
         if (!currentBadges.includes(badgeId)) {
           await updateDoc(userDocRef, {
             badges: [...currentBadges, badgeId]
           });
+          console.log(`Awarded badge "${badgeId}" to user ${userId}`);
+        } else {
+           console.log(`User ${userId} already has badge "${badgeId}".`);
         }
+      } else {
+           console.warn(`Attempted to award badge to non-existent profile for user ${userId}`);
+           // Optionally create profile here or handle differently
       }
   } catch(error) {
        console.error(`Error awarding badge ${badgeId} to user ${userId}:`, error);
