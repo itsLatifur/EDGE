@@ -83,14 +83,12 @@ export default function AuthPage() {
       await signIn(user);
 
       // Note: Firestore user document creation is now handled within the `signIn` logic (in AuthProvider)
-      // We might still need to explicitly create the progress doc if signIn doesn't.
-      // Let's assume signIn handles profile, check if progress needs creation.
+      // Check if progress needs creation (though signIn might handle this indirectly)
       const progressDocRef = doc(db, 'userProgress', user.uid);
       const progressSnap = await getDoc(progressDocRef);
       if (!progressSnap.exists()) {
           await setDoc(progressDocRef, {}); // Create empty progress doc if needed
       }
-
 
       toast({ title: 'Registration Successful', description: 'Welcome to Self-Learn!' });
       router.push('/'); // Redirect to home page
@@ -138,7 +136,9 @@ export default function AuthPage() {
 
 
   return (
-    <div className="flex items-center justify-center py-12">
+    // Centering and padding for responsiveness
+    <div className="flex items-center justify-center min-h-[calc(100vh-10rem)] py-8 sm:py-12 px-4">
+      {/* Responsive Tabs width */}
       <Tabs defaultValue="login" className="w-full max-w-md">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">Login</TabsTrigger>
@@ -148,13 +148,13 @@ export default function AuthPage() {
         {/* Login Tab */}
         <TabsContent value="login">
           <Card>
-            <CardHeader>
-              <CardTitle>Login</CardTitle>
-              <CardDescription>Access your learning dashboard & saved progress.</CardDescription>
+            <CardHeader className="px-4 pt-6 pb-4 sm:px-6">
+              <CardTitle className="text-xl sm:text-2xl">Login</CardTitle>
+              <CardDescription className="text-sm sm:text-base">Access your learning dashboard & saved progress.</CardDescription>
             </CardHeader>
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(handleLogin)}>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 px-4 sm:px-6">
                    {/* Social Login */}
                    <div className="relative">
                        <div className="absolute inset-0 flex items-center">
@@ -214,7 +214,7 @@ export default function AuthPage() {
                     )}
                   />
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="px-4 pb-6 sm:px-6">
                   <Button type="submit" className="w-full" disabled={isLoading}>
                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                      Login
@@ -228,13 +228,13 @@ export default function AuthPage() {
         {/* Register Tab */}
         <TabsContent value="register">
           <Card>
-            <CardHeader>
-              <CardTitle>Register</CardTitle>
-              <CardDescription>Create an account to save progress & earn rewards.</CardDescription>
+            <CardHeader className="px-4 pt-6 pb-4 sm:px-6">
+              <CardTitle className="text-xl sm:text-2xl">Register</CardTitle>
+              <CardDescription className="text-sm sm:text-base">Create an account to save progress & earn rewards.</CardDescription>
             </CardHeader>
              <Form {...registerForm}>
                <form onSubmit={registerForm.handleSubmit(handleRegister)}>
-                 <CardContent className="space-y-4">
+                 <CardContent className="space-y-4 px-4 sm:px-6">
                     {/* Social Login */}
                    <div className="relative">
                        <div className="absolute inset-0 flex items-center">
@@ -307,7 +307,7 @@ export default function AuthPage() {
                      )}
                    />
                  </CardContent>
-                 <CardFooter>
+                 <CardFooter className="px-4 pb-6 sm:px-6">
                     <Button type="submit" className="w-full" disabled={isLoading}>
                      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                      Register

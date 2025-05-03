@@ -62,11 +62,11 @@ const ResourceCard: React.FC<{ resource: Resource }> = ({ resource }) => {
   };
 
   return (
-    <Card className="flex flex-col h-full overflow-hidden transition-shadow hover:shadow-md">
-      <CardHeader className="pb-4">
-        <div className="flex justify-between items-start gap-2">
-            <CardTitle className="text-lg font-semibold leading-tight">{resource.title}</CardTitle>
-             <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap ${typeColors[resource.type]}`}>
+    <Card className="flex flex-col h-full overflow-hidden transition-shadow duration-300 hover:shadow-md">
+      <CardHeader className="pb-3 sm:pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+            <CardTitle className="text-base sm:text-lg font-semibold leading-tight flex-grow">{resource.title}</CardTitle>
+             <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap flex-shrink-0 mt-1 sm:mt-0 ${typeColors[resource.type]}`}>
                  {resource.type.charAt(0).toUpperCase() + resource.type.slice(1)}
             </span>
         </div>
@@ -74,10 +74,10 @@ const ResourceCard: React.FC<{ resource: Resource }> = ({ resource }) => {
            <p className="text-xs text-muted-foreground pt-1">Source: {resource.source}</p>
         )}
       </CardHeader>
-      <CardContent className="flex-grow pb-4">
+      <CardContent className="flex-grow pb-3 sm:pb-4">
         <p className="text-sm text-muted-foreground">{resource.description}</p>
       </CardContent>
-      <div className="p-4 pt-0">
+      <div className="p-4 pt-0 mt-auto"> {/* Ensure button is at the bottom */}
         <Button variant="outline" size="sm" asChild className="w-full">
           <Link href={resource.url} target="_blank" rel="noopener noreferrer">
             Visit Resource
@@ -103,18 +103,19 @@ export default function BlogsPage() {
   };
 
   return (
-    <div className="animate-fadeIn space-y-8 mt-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
+    <div className="animate-fadeIn space-y-6 sm:space-y-8 mt-6 sm:mt-8 lg:mt-10">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2">
           Curated Resources & Links
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Explore helpful blogs, documentation, tutorials, and tools for HTML, CSS, and JavaScript.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-card border">
+        {/* Responsive Tabs List */}
+        <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-card border max-w-lg mx-auto">
           {Object.keys(mockResources).map((key) => {
              const category = key as ResourceCategory;
              const Icon = resourceIcons[category];
@@ -122,10 +123,11 @@ export default function BlogsPage() {
                  <TabsTrigger
                      key={category}
                      value={category}
-                     className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0"
+                     className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0 text-xs sm:text-sm py-2 sm:py-2.5"
                  >
-                     <Icon className="h-4 w-4 mr-2" />
-                     {category.toUpperCase()}
+                     <Icon className="h-4 w-4 mr-1.5 sm:mr-2" />
+                     <span className="hidden sm:inline">{category.toUpperCase()}</span>
+                     <span className="sm:hidden">{category.toUpperCase()}</span> {/* Show uppercase on small screens too */}
                  </TabsTrigger>
              );
           })}
@@ -136,8 +138,8 @@ export default function BlogsPage() {
           return (
             <TabsContent key={category} value={category} className="mt-6">
               {isLoading ? (
-                // Skeleton Loading State
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                // Skeleton Loading State - Responsive Grid
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {[...Array(6)].map((_, i) => (
                     <Card key={i} className="animate-pulse">
                       <CardHeader><Skeleton className="h-5 w-3/4 rounded" /></CardHeader>
@@ -150,8 +152,8 @@ export default function BlogsPage() {
                   ))}
                 </div>
               ) : (
-                // Actual Content
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                // Actual Content - Responsive Grid
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {mockResources[category].map((resource) => (
                     <ResourceCard key={resource.id} resource={resource} />
                   ))}

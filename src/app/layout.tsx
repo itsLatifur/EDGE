@@ -45,7 +45,8 @@ export default function RootLayout({
         >
           <AuthProvider> {/* Wrap content with AuthProvider */}
             <Header />
-            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 relative">
+             {/* Responsive padding for main content */}
+            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 relative">
                {children}
             </main>
             <Footer />

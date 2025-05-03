@@ -40,11 +40,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let profileData: UserProfile | null = null;
 
     if (userDocSnap.exists()) {
-      profileData = userDocSnap.data() as UserProfile;
+      const data = userDocSnap.data();
        // Ensure createdAt is a Date object
-       if (profileData.createdAt && profileData.createdAt instanceof Timestamp) {
-           profileData.createdAt = profileData.createdAt.toDate();
+       let createdAtDate = new Date(); // Default to now
+       if (data.createdAt && data.createdAt instanceof Timestamp) {
+           createdAtDate = data.createdAt.toDate();
        }
+       profileData = {
+         uid: data.uid || firebaseUser.uid,
+         email: data.email || firebaseUser.email || '',
+         displayName: data.displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+         avatarUrl: data.avatarUrl || firebaseUser.photoURL || undefined, // Include avatarUrl
+         points: data.points ?? 0,
+         badges: Array.isArray(data.badges) ? data.badges : [],
+         createdAt: createdAtDate,
+       };
     } else {
       // Create a basic profile if it doesn't exist (e.g., after social sign-in)
       console.log(`Creating new profile for user ${firebaseUser.uid}`);
@@ -52,6 +62,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         uid: firebaseUser.uid,
         email: firebaseUser.email || '',
         displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+        avatarUrl: firebaseUser.photoURL || undefined, // Include avatarUrl on creation
         points: 0,
         badges: [],
         createdAt: new Date(), // Use JS Date directly here
@@ -86,7 +97,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const mergedProgress = mergeProgress(firestoreProgress || {}, guestProgress);
 
       // 5. Save merged progress back to Firestore (only if changes occurred)
-      if (Object.keys(mergedProgress).length > (Object.keys(firestoreProgress || {}).length)) { // Simple check if merging added/updated anything
+      // Refined check: compare keys and values for actual differences
+       let hasChanges = false;
+       const mergedKeys = Object.keys(mergedProgress);
+       const firestoreKeys = Object.keys(firestoreProgress || {});
+
+       if (mergedKeys.length !== firestoreKeys.length) {
+           hasChanges = true;
+       } else {
+           for (const key of mergedKeys) {
+               const mergedEntry = mergedProgress[key];
+               const firestoreEntry = firestoreProgress ? firestoreProgress[key] : undefined;
+               if (!firestoreEntry ||
+                   mergedEntry.watchedTime !== firestoreEntry.watchedTime ||
+                   mergedEntry.completed !== firestoreEntry.completed ||
+                   mergedEntry.lastWatched.getTime() !== firestoreEntry.lastWatched.getTime()) {
+                   hasChanges = true;
+                   break;
+               }
+           }
+       }
+
+       if (hasChanges) {
            console.log("Merging guest progress into Firestore...");
            for (const videoId in mergedProgress) {
               const entry = mergedProgress[videoId];
@@ -145,11 +177,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [fetchUserProfileAndSet]);
 
 
-  // Function to manually refresh user profile data (remains the same)
+  // Function to manually refresh user profile data
   const refreshUserProfile = async () => {
     if (user) {
        console.log("Refreshing user profile...");
+       setLoading(true); // Add loading state during refresh
        await fetchUserProfileAndSet(user);
+       setLoading(false);
     } else {
         console.log("Cannot refresh profile, no user logged in.");
     }

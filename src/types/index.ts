@@ -3,6 +3,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  avatarUrl?: string; // Optional avatar URL
   points: number;
   badges: string[]; // Array of badge identifiers (e.g., 'html-basics-completed')
   createdAt: Date; // Use JS Date object in the application

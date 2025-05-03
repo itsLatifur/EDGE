@@ -213,44 +213,17 @@ function VideoPageContent() {
 
     // Display loading skeleton while auth or progress data is loading
     if (authLoading || isLoading) {
-        return (
-        <div className="space-y-8 mt-6 animate-pulse">
-            {/* Tabs Skeleton */}
-            <Skeleton className="h-10 w-full md:w-1/2 rounded-md mb-6" />
-            {/* Content Area Skeleton */}
-            <Card className="overflow-hidden">
-            <CardHeader>
-                <Skeleton className="h-6 w-1/3 rounded" />
-                <Skeleton className="h-4 w-1/2 rounded" />
-            </CardHeader>
-            <CardContent className="p-0">
-                <div className="flex flex-col md:flex-row">
-                    {/* Video Player Skeleton */}
-                    <div className="w-full md:flex-grow aspect-video bg-muted flex items-center justify-center">
-                        <PlayCircle className="h-16 w-16 text-muted-foreground/30" />
-                    </div>
-                    {/* Playlist Skeleton */}
-                    <div className="w-full md:w-80 lg:w-96 p-4 space-y-3 border-t md:border-t-0 md:border-l">
-                        <Skeleton className="h-16 w-full rounded" />
-                        <Skeleton className="h-16 w-full rounded" />
-                        <Skeleton className="h-16 w-full rounded" />
-                        <Skeleton className="h-16 w-full rounded" />
-                    </div>
-                </div>
-            </CardContent>
-            </Card>
-        </div>
-        );
+        return <VideoPageSkeleton />; // Use the dedicated skeleton component
     }
 
     // Display welcome/content for both logged-in and guest users
     return (
-        <div className="animate-fadeIn space-y-8 mt-6">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
+        <div className="animate-fadeIn space-y-6 sm:space-y-8 mt-6 sm:mt-8 lg:mt-10">
+            <div className="mb-6 sm:mb-8">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2">
                     Learn with Interactive Videos
                 </h1>
-                <p className="text-muted-foreground">
+                <p className="text-sm sm:text-base text-muted-foreground">
                     Select a topic (HTML, CSS, or JavaScript) to start watching tutorials and tracking your progress.
                 </p>
                  {isGuest && (
@@ -261,15 +234,17 @@ function VideoPageContent() {
             </div>
 
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PlaylistType)} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-card border">
+                 {/* Responsive Tabs List */}
+                <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-card border max-w-lg mx-auto">
                     {Object.values(mockPlaylists).map((playlist) => (
                         <TabsTrigger
                         key={playlist.id}
                         value={playlist.id}
-                        className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0"
+                        className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0 text-xs sm:text-sm py-2 sm:py-2.5"
                         >
-                        <playlist.icon className="h-4 w-4 mr-2" />
-                        {playlist.id.toUpperCase()}
+                        <playlist.icon className="h-4 w-4 mr-1.5 sm:mr-2" />
+                        <span className="hidden sm:inline">{playlist.id.toUpperCase()}</span>
+                        <span className="sm:hidden">{playlist.id.toUpperCase()}</span>
                         </TabsTrigger>
                     ))}
                 </TabsList>
@@ -302,31 +277,33 @@ export default function VideosPage() {
 }
 
 
-// Skeleton component to show while waiting for Suspense boundary
+// Skeleton component to show while waiting for Suspense boundary or loading
 function VideoPageSkeleton() {
      return (
-      <div className="space-y-8 mt-6 animate-pulse">
+      <div className="space-y-6 sm:space-y-8 mt-6 sm:mt-8 lg:mt-10 animate-pulse">
          {/* Intro Skeleton */}
-        <div className="space-y-2 mb-8">
+        <div className="space-y-2 mb-6 sm:mb-8">
             <Skeleton className="h-8 w-1/2 rounded-md" />
             <Skeleton className="h-4 w-3/4 rounded-md" />
+            <Skeleton className="h-8 w-48 rounded-md mt-3" /> {/* Skeleton for Sign In button */}
         </div>
         {/* Tabs Skeleton */}
-        <Skeleton className="h-10 w-full md:w-1/2 rounded-md mb-6" />
+        <Skeleton className="h-10 w-full max-w-lg mx-auto rounded-md mb-6" />
          {/* Content Area Skeleton */}
         <Card className="overflow-hidden">
-          <CardHeader>
+          <CardHeader className="p-4">
               <Skeleton className="h-6 w-1/3 rounded" />
-              <Skeleton className="h-4 w-1/2 rounded" />
+              <Skeleton className="h-4 w-1/2 rounded mt-1" />
           </CardHeader>
           <CardContent className="p-0">
               <div className="flex flex-col md:flex-row">
                   {/* Video Player Skeleton */}
                   <div className="w-full md:flex-grow aspect-video bg-muted flex items-center justify-center">
-                     <PlayCircle className="h-16 w-16 text-muted-foreground/30" />
+                     <PlayCircle className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30" />
                   </div>
                   {/* Playlist Skeleton */}
-                  <div className="w-full md:w-80 lg:w-96 p-4 space-y-3 border-t md:border-t-0 md:border-l">
+                  <div className="w-full md:w-80 lg:w-96 p-2 sm:p-4 space-y-2 sm:space-y-3 border-t md:border-t-0 md:border-l h-[50vh] md:h-auto overflow-y-auto">
+                      <Skeleton className="h-16 w-full rounded" />
                       <Skeleton className="h-16 w-full rounded" />
                       <Skeleton className="h-16 w-full rounded" />
                       <Skeleton className="h-16 w-full rounded" />
