@@ -1,7 +1,8 @@
+
 'use client';
 
 import Link from 'next/link';
-import { Code, LogIn, LogOut, UserCircle, Star, Menu, BookOpen, PlaySquare } from 'lucide-react';
+import { Code, LogIn, LogOut, UserCircle, Star, Menu, BookOpen, PlaySquare, Flame } from 'lucide-react'; // Added Flame
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
@@ -55,6 +56,7 @@ export default function Header() {
   const navItems = [
     { href: "/videos", label: "Videos", icon: PlaySquare },
     { href: "/blogs", label: "Blogs/Links", icon: BookOpen },
+    // { href: "/leaderboard", label: "Leaderboard", icon: Users }, // Example: Add Leaderboard link
   ];
 
   return (
@@ -187,14 +189,24 @@ export default function Header() {
 
         {/* Right Side (Auth/Theme Toggle) */}
         <div className="flex items-center gap-2 sm:gap-3 ml-auto"> {/* Use ml-auto to push it right */}
-            {/* Gamification/Points Display */}
+            {/* Gamification/Points/Streak Display */}
             {!isGuest && userProfile && !loading && (
-                <div className="hidden sm:flex items-center gap-1 mr-2 text-sm font-medium text-amber-500 dark:text-amber-400">
-                    <Star className="h-4 w-4 fill-current" />
-                    <span>{userProfile.points} pts</span>
+                <div className="hidden sm:flex items-center gap-3 mr-2 text-sm font-medium">
+                    {/* Points */}
+                    <div className="flex items-center gap-1 text-amber-500 dark:text-amber-400">
+                        <Star className="h-4 w-4 fill-current" />
+                        <span>{userProfile.points} pts</span>
+                    </div>
+                    {/* Streak */}
+                    {userProfile.currentStreak > 0 && (
+                        <div className="flex items-center gap-1 text-orange-500 dark:text-orange-400">
+                            <Flame className="h-4 w-4" />
+                            <span>{userProfile.currentStreak}</span>
+                        </div>
+                    )}
                 </div>
             )}
-            {loading && !isGuest && <Skeleton className="h-6 w-16 mr-2 rounded-md hidden sm:block" /> }
+            {loading && !isGuest && <Skeleton className="h-6 w-24 mr-2 rounded-md hidden sm:block" /> }
 
            <ThemeToggle />
 
@@ -218,9 +230,18 @@ export default function Header() {
                         <p className="text-xs leading-none text-muted-foreground">
                           {user.email}
                         </p>
-                        <div className="flex items-center gap-1 pt-1 text-xs text-amber-500 dark:text-amber-400">
-                           <Star className="h-3 w-3 fill-current" />
-                           <span>{userProfile?.points ?? 0} points</span>
+                        {/* Points and Streak in Dropdown */}
+                        <div className="flex items-center gap-3 pt-1.5">
+                            <div className="flex items-center gap-1 text-xs text-amber-500 dark:text-amber-400">
+                               <Star className="h-3 w-3 fill-current" />
+                               <span>{userProfile?.points ?? 0} points</span>
+                            </div>
+                            {userProfile && userProfile.currentStreak > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-orange-500 dark:text-orange-400">
+                                   <Flame className="h-3 w-3" />
+                                   <span>{userProfile.currentStreak} day streak</span>
+                                </div>
+                            )}
                         </div>
                       </div>
                     </DropdownMenuLabel>

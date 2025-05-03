@@ -1,8 +1,23 @@
 import { db } from '@/lib/firebase/config';
-import { doc, getDoc, setDoc, updateDoc, Timestamp, increment, serverTimestamp, FieldValue } from 'firebase/firestore';
-import type { UserProgress, UserProgressEntry, UserProfile } from '@/types';
+import { doc, getDoc, setDoc, updateDoc, Timestamp, increment, FieldValue, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import type { UserProgress, UserProgressEntry, UserProfile, LeaderboardEntry, PlaylistType, BadgeId } from '@/types';
+import { BADGE_IDS } from '@/types'; // Import BADGE_IDS
+import { mockPlaylists } from '@/lib/data/playlists'; // Needed for Trifecta badge check
 
 const GUEST_PROGRESS_KEY = 'selfLearnGuestProgress';
+
+// --- Helper functions for Dates ---
+const isSameDay = (date1: Date, date2: Date): boolean => {
+    return date1.getFullYear() === date2.getFullYear() &&
+           date1.getMonth() === date2.getMonth() &&
+           date1.getDate() === date2.getDate();
+};
+
+const isConsecutiveDay = (date1: Date, date2: Date): boolean => {
+    const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
+    const diffDays = Math.round(Math.abs((date1.getTime() - date2.getTime()) / oneDay));
+    return diffDays === 1;
+};
 
 // --- Guest Progress (Local Storage) ---
 
@@ -83,7 +98,46 @@ export const clearGuestProgress = (): void => {
   }
 };
 
-// --- Firestore User Progress ---
+// --- Firestore User Progress & Profile ---
+
+// Fetch user profile (including streak info)
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    if (!userId) return null;
+    const userDocRef = doc(db, 'users', userId);
+    try {
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            // Convert Firestore Timestamps to Dates, handle potential undefined/null
+            const createdAtTimestamp = data.createdAt;
+            const createdAt = createdAtTimestamp instanceof Timestamp ? createdAtTimestamp.toDate() : new Date();
+            const lastActivityTimestamp = data.lastActivityDate;
+            // Handle null or undefined lastActivityDate
+            const lastActivityDate = lastActivityTimestamp instanceof Timestamp ? lastActivityTimestamp.toDate() : null;
+
+            return {
+                uid: data.uid || userId,
+                email: data.email || '',
+                displayName: data.displayName || 'Learner',
+                avatarUrl: data.avatarUrl || undefined,
+                points: data.points ?? 0,
+                badges: Array.isArray(data.badges) ? data.badges : [],
+                createdAt: createdAt,
+                // Gamification fields
+                currentStreak: data.currentStreak ?? 0,
+                longestStreak: data.longestStreak ?? 0,
+                lastActivityDate: lastActivityDate,
+            } as UserProfile;
+        } else {
+            console.log(`Profile not found for user ${userId}, potentially a new user.`);
+            return null;
+        }
+    } catch (error) {
+         console.error(`Error fetching profile for user ${userId}:`, error);
+    }
+    return null;
+};
+
 
 // Fetch user progress data from Firestore
 export const getUserProgress = async (userId: string): Promise<UserProgress | null> => {
@@ -102,10 +156,8 @@ export const getUserProgress = async (userId: string): Promise<UserProgress | nu
                     completed: data[videoId].completed ?? false,
                  };
             } else {
-                 // Log a warning but still try to provide a default structure if possible
                  console.warn(`Invalid or missing Firestore progress data format for video ${videoId}, user ${userId}. Using defaults.`);
-                 // Create a default entry if needed, or skip
-                 // progress[videoId] = { watchedTime: 0, lastWatched: new Date(0), completed: false };
+                 // Optionally create default entry: progress[videoId] = { watchedTime: 0, lastWatched: new Date(0), completed: false };
             }
         }
         return progress;
@@ -119,34 +171,148 @@ export const getUserProgress = async (userId: string): Promise<UserProgress | nu
   return null; // Return null on error
 };
 
-// Update user progress data in Firestore
+
+// Update user progress AND profile (for streaks)
 export const updateUserProgress = async (
     userId: string,
     videoId: string,
     watchedTime: number,
     isCompleted: boolean,
-    lastWatchedDate: Date = new Date() // Optional: allow passing specific date for merging
-    ): Promise<void> => {
-  if (!userId) return;
-  const progressDocRef = doc(db, 'userProgress', userId);
-  const updateData: { [key: string]: any } = {};
-  const fieldPathPrefix = `${videoId}`; // Using videoId directly as key should be fine
+    lastWatchedDate: Date = new Date() // This is the CURRENT timestamp of the update
+): Promise<{ pointsAwarded: number; badgesAwarded: BadgeId[] }> => {
+    if (!userId) return { pointsAwarded: 0, badgesAwarded: [] };
 
-  updateData[`${fieldPathPrefix}.watchedTime`] = watchedTime;
-  // Ensure we use Firestore Timestamp when writing
-  updateData[`${fieldPathPrefix}.lastWatched`] = Timestamp.fromDate(lastWatchedDate);
-  updateData[`${fieldPathPrefix}.completed`] = isCompleted;
+    const progressDocRef = doc(db, 'userProgress', userId);
+    const userDocRef = doc(db, 'users', userId);
+    let pointsAwarded = 0;
+    let badgesAwarded: BadgeId[] = [];
 
-  try {
-      // Use setDoc with merge: true to create the document if it doesn't exist
-      // or update specific fields if it does.
-      await setDoc(progressDocRef, updateData, { merge: true });
-  } catch(error) {
-       console.error(`Error updating Firestore progress for user ${userId}, video ${videoId}:`, error);
-       throw error; // Re-throw error to be handled by the caller if needed
-  }
+    const progressUpdateData: { [key: string]: any } = {};
+    const fieldPathPrefix = `${videoId}`;
+    progressUpdateData[`${fieldPathPrefix}.watchedTime`] = watchedTime;
+    progressUpdateData[`${fieldPathPrefix}.lastWatched`] = Timestamp.fromDate(lastWatchedDate);
+    progressUpdateData[`${fieldPathPrefix}.completed`] = isCompleted;
+
+    try {
+        // Fetch current profile for streak calculation
+        const userProfile = await getUserProfile(userId);
+        if (!userProfile) {
+            console.warn(`Cannot update progress/streaks for non-existent profile: ${userId}`);
+            return { pointsAwarded: 0, badgesAwarded: [] };
+        }
+
+        // Use setDoc with merge: true for progress to handle creation/update
+        await setDoc(progressDocRef, progressUpdateData, { merge: true });
+
+        // --- Streak Calculation ---
+        const profileUpdateData: { [key: string]: any } = {};
+        let currentStreak = userProfile.currentStreak || 0;
+        let longestStreak = userProfile.longestStreak || 0;
+
+        if (userProfile.lastActivityDate) {
+            if (!isSameDay(userProfile.lastActivityDate, lastWatchedDate)) {
+                if (isConsecutiveDay(userProfile.lastActivityDate, lastWatchedDate)) {
+                    currentStreak++;
+                } else {
+                    currentStreak = 1; // Streak broken, reset to 1 for today's activity
+                }
+            }
+            // If it's the same day, streak doesn't change
+        } else {
+            currentStreak = 1; // First activity ever
+        }
+
+        if (currentStreak > longestStreak) {
+            longestStreak = currentStreak;
+        }
+
+        // Only update profile if streak or last activity date changed
+        if (currentStreak !== userProfile.currentStreak || longestStreak !== userProfile.longestStreak || !userProfile.lastActivityDate || !isSameDay(userProfile.lastActivityDate, lastWatchedDate)) {
+            profileUpdateData.currentStreak = currentStreak;
+            profileUpdateData.longestStreak = longestStreak;
+            profileUpdateData.lastActivityDate = Timestamp.fromDate(lastWatchedDate); // Update last activity date
+            await updateDoc(userDocRef, profileUpdateData);
+            console.log(`User ${userId} streak updated: Current ${currentStreak}, Longest ${longestStreak}`);
+
+             // Award streak badges
+             if (currentStreak >= 3 && !userProfile.badges.includes(BADGE_IDS.STREAK_3)) badgesAwarded.push(BADGE_IDS.STREAK_3);
+             if (currentStreak >= 7 && !userProfile.badges.includes(BADGE_IDS.STREAK_7)) badgesAwarded.push(BADGE_IDS.STREAK_7);
+             if (currentStreak >= 30 && !userProfile.badges.includes(BADGE_IDS.STREAK_30)) badgesAwarded.push(BADGE_IDS.STREAK_30);
+        }
+
+        // Award points if the video is newly completed
+        const previousProgress = await getUserProgress(userId);
+        const wasPreviouslyCompleted = previousProgress?.[videoId]?.completed || false;
+        if (isCompleted && !wasPreviouslyCompleted) {
+            pointsAwarded = 10; // Example points
+            await awardPoints(userId, pointsAwarded);
+        }
+
+        // Award playlist and trifecta badges if applicable (re-fetch progress after update)
+         if (isCompleted) {
+            const updatedProgress = await getUserProgress(userId); // Fetch latest progress
+            if (updatedProgress) {
+                const badgeCheckResult = await checkAndAwardCompletionBadges(userId, userProfile.badges, updatedProgress);
+                badgesAwarded = [...badgesAwarded, ...badgeCheckResult];
+            }
+         }
+
+        // Apply newly awarded badges
+        if (badgesAwarded.length > 0) {
+            const uniqueNewBadges = badgesAwarded.filter(badge => !userProfile.badges.includes(badge));
+            if (uniqueNewBadges.length > 0) {
+                 await updateDoc(userDocRef, {
+                     badges: [...userProfile.badges, ...uniqueNewBadges]
+                 });
+                 console.log(`Awarded new badges: ${uniqueNewBadges.join(', ')} to user ${userId}`);
+            }
+        }
+
+        return { pointsAwarded, badgesAwarded: uniqueNewBadges }; // Return only newly awarded badges
+
+    } catch (error) {
+        console.error(`Error updating Firestore progress/profile for user ${userId}, video ${videoId}:`, error);
+        throw error;
+    }
 };
 
+// Helper to check for playlist completion and award badges
+const checkAndAwardCompletionBadges = async (userId: string, currentBadges: BadgeId[], userProgress: UserProgress): Promise<BadgeId[]> => {
+    let awardedBadges: BadgeId[] = [];
+    let allPlaylistsCompleted = true;
+
+    for (const playlistId in mockPlaylists) {
+        const typedPlaylistId = playlistId as PlaylistType;
+        const playlist = mockPlaylists[typedPlaylistId];
+        const badgeId = (BADGE_IDS as Record<string, BadgeId>)[`${typedPlaylistId.toUpperCase()}_MASTER`] || (BADGE_IDS as Record<string, BadgeId>)[`${typedPlaylistId.toUpperCase()}_STYLIST`] || (BADGE_IDS as Record<string, BadgeId>)[`${typedPlaylistId.toUpperCase()}_NINJA`]; // Map playlist ID to badge ID
+
+        if (badgeId && !currentBadges.includes(badgeId)) {
+            const playlistComplete = playlist.videos.every(v => userProgress[v.id]?.completed);
+            if (playlistComplete) {
+                awardedBadges.push(badgeId);
+            } else {
+                allPlaylistsCompleted = false; // If any playlist is not complete
+            }
+        } else if (!badgeId) {
+             console.warn(`No badge ID defined for playlist: ${playlistId}`);
+             // Decide if missing badge definition means playlist completion doesn't count towards trifecta
+             const playlistComplete = playlist.videos.every(v => userProgress[v.id]?.completed);
+             if(!playlistComplete) allPlaylistsCompleted = false;
+        } else if (!currentBadges.includes(badgeId)) {
+             // Badge exists but user doesn't have it, check if playlist is complete
+             const playlistComplete = playlist.videos.every(v => userProgress[v.id]?.completed);
+             if (!playlistComplete) allPlaylistsCompleted = false;
+        }
+        // If user already has the badge, we assume the playlist is complete for trifecta check
+    }
+
+    // Check for Trifecta badge
+    if (allPlaylistsCompleted && !currentBadges.includes(BADGE_IDS.TRIFECTA)) {
+        awardedBadges.push(BADGE_IDS.TRIFECTA);
+    }
+
+    return awardedBadges;
+};
 
 // --- Merging Logic ---
 
@@ -183,84 +349,98 @@ export const mergeProgress = (firestoreProgress: UserProgress, guestProgress: Us
 };
 
 
-// --- User Profile & Gamification (Firestore) ---
+// --- Gamification Firestore Functions ---
 
-// Fetch user profile
-export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-    if (!userId) return null;
-    const userDocRef = doc(db, 'users', userId);
-    try {
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-            const data = userDocSnap.data();
-             // Convert Firestore Timestamp to Date, handle potential undefined
-            const createdAtTimestamp = data.createdAt;
-            const createdAt = createdAtTimestamp instanceof Timestamp ? createdAtTimestamp.toDate() : new Date(); // Default to now if missing/invalid
-
-            return {
-                uid: data.uid || userId, // Ensure uid is present
-                email: data.email || '',
-                displayName: data.displayName || 'Learner',
-                points: data.points ?? 0,
-                badges: Array.isArray(data.badges) ? data.badges : [], // Ensure badges is an array
-                createdAt: createdAt,
-            } as UserProfile;
-        } else {
-            console.log(`Profile not found for user ${userId}, potentially a new user.`);
-            return null; // Return null if profile doesn't exist yet
-        }
-    } catch (error) {
-         console.error(`Error fetching profile for user ${userId}:`, error);
-    }
-    return null; // Return null on error
-}
-
-// Award points to a user
-export const awardPoints = async (userId: string, points: number): Promise<void> => {
-  if (!userId || points === 0) return; // Don't update if no points
+// Award points to a user (Now internal, called by updateUserProgress)
+const awardPoints = async (userId: string, points: number): Promise<void> => {
+  if (!userId || points <= 0) return;
   const userDocRef = doc(db, 'users', userId);
    try {
-       // Use updateDoc which requires the document to exist.
-       // If creating profile/awarding points first time, ensure profile exists first.
        await updateDoc(userDocRef, {
            points: increment(points)
        });
        console.log(`Awarded ${points} points to user ${userId}`);
    } catch(error) {
        console.error(`Error awarding points to user ${userId}:`, error);
-        // Consider if profile might not exist yet
-       const profile = await getUserProfile(userId);
-       if (!profile) {
-           console.warn(`Attempted to award points to non-existent profile for user ${userId}`);
-           // Optionally create profile here or handle differently
-       }
+       // Profile should exist if updateUserProgress called this
    }
 };
 
-// Award a badge to a user
-export const awardBadge = async (userId: string, badgeId: string): Promise<void> => {
+// Award a badge to a user (Now internal, called by updateUserProgress)
+const awardBadge = async (userId: string, badgeId: BadgeId): Promise<void> => {
   if (!userId || !badgeId) return;
   const userDocRef = doc(db, 'users', userId);
 
   try {
-      const userDocSnap = await getDoc(userDocRef);
+      // Fetch fresh data before updating to avoid race conditions if needed,
+      // but updateUserProgress already passes current badges.
+      // We'll trust the logic in updateUserProgress to prevent duplicates for now.
+       await updateDoc(userDocRef, {
+         badges: FieldValue.arrayUnion(badgeId) // Use arrayUnion for safety
+       });
+       console.log(`Awarded badge "${badgeId}" to user ${userId}`);
 
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data();
-        const currentBadges = Array.isArray(userData.badges) ? userData.badges : []; // Ensure it's an array
-        if (!currentBadges.includes(badgeId)) {
-          await updateDoc(userDocRef, {
-            badges: [...currentBadges, badgeId]
-          });
-          console.log(`Awarded badge "${badgeId}" to user ${userId}`);
-        } else {
-           console.log(`User ${userId} already has badge "${badgeId}".`);
-        }
-      } else {
-           console.warn(`Attempted to award badge to non-existent profile for user ${userId}`);
-           // Optionally create profile here or handle differently
-      }
   } catch(error) {
        console.error(`Error awarding badge ${badgeId} to user ${userId}:`, error);
+       // Profile should exist
   }
+};
+
+
+// --- Leaderboard ---
+
+export const getLeaderboard = async (count: number = 10): Promise<LeaderboardEntry[]> => {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, orderBy("points", "desc"), limit(count));
+    const leaderboard: LeaderboardEntry[] = [];
+
+    try {
+        const querySnapshot = await getDocs(q);
+        let rank = 1;
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            leaderboard.push({
+                uid: doc.id,
+                displayName: data.displayName || 'Anonymous',
+                avatarUrl: data.avatarUrl || undefined,
+                points: data.points ?? 0,
+                rank: rank++,
+            });
+        });
+        return leaderboard;
+    } catch (error) {
+        console.error("Error fetching leaderboard:", error);
+        return []; // Return empty array on error
+    }
+};
+
+// Create User Profile (used during sign-up/initial social sign-in)
+export const createUserProfileDocument = async (uid: string, email: string | null, displayName: string | null, photoURL: string | null): Promise<UserProfile> => {
+    const userDocRef = doc(db, 'users', uid);
+    const createdAt = new Date(); // Use JS Date for the object
+
+    const newProfile: UserProfile = {
+        uid: uid,
+        email: email || '',
+        displayName: displayName || email?.split('@')[0] || 'Learner',
+        avatarUrl: photoURL || undefined,
+        points: 0,
+        badges: [],
+        createdAt: createdAt,
+        // Initialize streak fields
+        currentStreak: 0,
+        longestStreak: 0,
+        lastActivityDate: null,
+    };
+
+    // Ensure createdAt and lastActivityDate are Firestore Timestamps when writing
+    const firestoreData = {
+        ...newProfile,
+        createdAt: Timestamp.fromDate(createdAt),
+        lastActivityDate: null, // Store null initially
+    };
+
+    await setDoc(userDocRef, firestoreData);
+    console.log(`Created profile for new user ${uid}`);
+    return newProfile; // Return the profile object with JS Dates
 };

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState, useEffect, useCallback, Suspense} from 'react';
@@ -7,18 +8,19 @@ import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/compo
 import {Skeleton} from '@/components/ui/skeleton';
 import LearningContent from '@/components/learning-content';
 import {useToast} from '@/hooks/use-toast';
-import { PlayCircle, Loader2 } from 'lucide-react';
+import { PlayCircle, Loader2, Award, Flame, Trophy } from 'lucide-react'; // Added Award, Flame, Trophy
 import { useAuth } from '@/context/auth-context';
 import {
     getUserProgress,
     updateUserProgress,
-    awardPoints,
-    awardBadge,
+    saveGuestProgress,
     loadGuestProgress,
-    updateGuestProgressEntry,
-    saveGuestProgress
+    // Removed explicit award functions, now handled within updateUserProgress
+    // awardPoints,
+    // awardBadge,
 } from '@/services/user-progress';
-import type { UserProgress, ContentItem, Playlist, PlaylistType } from '@/types';
+import type { UserProgress, ContentItem, Playlist, PlaylistType, BadgeId } from '@/types';
+import { BADGE_IDS } from '@/types'; // Import BADGE_IDS
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { mockPlaylists } from '@/lib/data/playlists'; // Import playlists from the data file
@@ -35,13 +37,18 @@ const findVideoDetails = (videoId: string): { video: ContentItem; playlistId: Pl
   return undefined;
 }
 
-// Define Points/Badges structure
-const VIDEO_COMPLETION_POINTS = 10;
-const PLAYLIST_COMPLETION_BADGES: Record<PlaylistType, string> = {
-    html: 'html-master',
-    css: 'css-stylist',
-    javascript: 'javascript-ninja',
+
+// Map badge IDs to display info
+const badgeDisplayInfo: Record<BadgeId, { name: string; icon: React.ElementType }> = {
+    [BADGE_IDS.HTML_MASTER]: { name: 'HTML Master', icon: Award },
+    [BADGE_IDS.CSS_STYLIST]: { name: 'CSS Stylist', icon: Award },
+    [BADGE_IDS.JS_NINJA]: { name: 'JavaScript Ninja', icon: Award },
+    [BADGE_IDS.STREAK_3]: { name: '3 Day Streak', icon: Flame },
+    [BADGE_IDS.STREAK_7]: { name: '7 Day Streak', icon: Flame },
+    [BADGE_IDS.STREAK_30]: { name: '30 Day Streak', icon: Flame },
+    [BADGE_IDS.TRIFECTA]: { name: 'Trifecta', icon: Trophy },
 };
+
 
 // Component using useSearchParams needs to be wrapped in Suspense
 function VideoPageContent() {
@@ -122,53 +129,53 @@ function VideoPageContent() {
         const needsUpdate = (cappedTime > previousWatchedTime + 1) || (isNowCompleted && !isAlreadyCompleted);
 
         if (needsUpdate) {
+            const updateTime = new Date(); // Consistent timestamp for this update
             const updatedProgressEntry = {
                 watchedTime: cappedTime,
-                lastWatched: new Date(),
+                lastWatched: updateTime,
                 completed: isAlreadyCompleted || isNowCompleted,
             };
             setUserProgress(prev => ({ ...(prev || {}), [videoId]: updatedProgressEntry }));
 
             try {
                 if (!isGuest && user) {
-                    await updateUserProgress(user.uid, videoId, cappedTime, updatedProgressEntry.completed, updatedProgressEntry.lastWatched);
+                     // updateUserProgress now handles points and badges internally
+                    const { pointsAwarded, badgesAwarded } = await updateUserProgress(
+                        user.uid,
+                        videoId,
+                        cappedTime,
+                        updatedProgressEntry.completed,
+                        updateTime
+                    );
 
-                    if (isNowCompleted) {
-                        await awardPoints(user.uid, VIDEO_COMPLETION_POINTS);
+                     // Show toasts for awarded points and badges
+                    if (pointsAwarded > 0) {
                         toast({
-                            title: "Video Completed!",
-                            description: `+${VIDEO_COMPLETION_POINTS} points earned!`,
+                            title: "Progress Saved!",
+                            description: `+${pointsAwarded} points earned!`,
                         });
-
-                        const playlistKey = videoDetailsResult.playlistId;
-                        const playlistVideos = mockPlaylists[playlistKey].videos;
-
-                        // Check completion against the *updated* local state
-                        const allCompleted = playlistVideos.every(v => {
-                            const entry = (userProgress || {})[v.id];
-                             return (v.id === videoId) ? updatedProgressEntry.completed : (entry?.completed || false);
-                        });
-
-                        if (allCompleted) {
-                            const badgeId = PLAYLIST_COMPLETION_BADGES[playlistKey];
-                            if (badgeId && userProfile && !userProfile.badges.includes(badgeId)) {
-                                await awardBadge(user.uid, badgeId);
-                                toast({
-                                    title: `Playlist Completed: ${mockPlaylists[playlistKey].title}`,
-                                    description: `You've earned the "${badgeId.replace(/-/g, ' ')}" badge!`,
-                                });
-                                await refreshUserProfile();
-                            }
-                        } else {
-                            await refreshUserProfile(); // Refresh points even if playlist not complete
-                        }
                     }
+                    if (badgesAwarded.length > 0) {
+                        badgesAwarded.forEach(badgeId => {
+                            const badgeInfo = badgeDisplayInfo[badgeId];
+                            toast({
+                                title: "Achievement Unlocked!",
+                                description: `You earned the "${badgeInfo?.name || badgeId.replace(/-/g, ' ')}" badge!`,
+                                // Add icon if available?
+                            });
+                        });
+                    }
+
+                    // Refresh user profile in context to reflect new points/badges/streak
+                    await refreshUserProfile();
+
                 } else {
+                    // Guest user progress update
                     updateGuestProgressEntry(videoId, cappedTime, updatedProgressEntry.completed);
                     if (isNowCompleted) {
                         toast({
                             title: "Video Completed!",
-                            description: "Sign in to save progress & earn points.",
+                            description: "Sign in to save progress & earn points/badges.",
                             duration: 7000,
                         });
                     }
@@ -180,7 +187,7 @@ function VideoPageContent() {
                     description: "Could not save your progress.",
                     variant: "destructive",
                 });
-                // Rollback optimistic update
+                // Rollback optimistic update for UI
                 setUserProgress(prev => {
                     const newState = { ...(prev || {}) };
                     if (previousWatchedTime === 0 && !isAlreadyCompleted) {
@@ -194,6 +201,7 @@ function VideoPageContent() {
                     }
                     return newState;
                 });
+                // Rollback guest storage if necessary
                 if (isGuest) {
                     const currentGuestProgress = loadGuestProgress() || {};
                     if (previousWatchedTime === 0 && !isAlreadyCompleted) {
@@ -201,7 +209,7 @@ function VideoPageContent() {
                     } else {
                         currentGuestProgress[videoId] = {
                             watchedTime: previousWatchedTime,
-                            lastWatched: currentProgressState[videoId]?.lastWatched || new Date(0),
+                            lastWatched: currentProgressState[videoId]?.lastWatched || new Date(0), // Revert lastWatched too
                             completed: isAlreadyCompleted,
                         };
                     }
@@ -209,7 +217,7 @@ function VideoPageContent() {
                 }
             }
         }
-    }, [user, userProgress, isGuest, userProfile, toast, refreshUserProfile]);
+    }, [user, userProgress, isGuest, toast, refreshUserProfile]); // Removed userProfile dependency
 
 
     // Display loading skeleton while auth or progress data is loading

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
@@ -5,7 +6,7 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase/config';
 import { doc, getDoc, setDoc, DocumentData, Timestamp } from 'firebase/firestore';
 import type { UserProfile, UserProgress } from '@/types';
-import { getUserProgress, updateUserProgress, saveGuestProgress, loadGuestProgress, clearGuestProgress, mergeProgress, getUserProfile } from '@/services/user-progress';
+import { getUserProgress, updateUserProgress, saveGuestProgress, loadGuestProgress, clearGuestProgress, mergeProgress, getUserProfile, createUserProfileDocument } from '@/services/user-progress'; // Import createUserProfileDocument
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
@@ -27,7 +28,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isGuest, setIsGuest] = useState(true); // Assume guest initially
   const { toast } = useToast();
 
-  const fetchUserProfileAndSet = useCallback(async (firebaseUser: FirebaseUser | null) => {
+  const fetchUserProfileAndSet = useCallback(async (firebaseUser: FirebaseUser | null): Promise<UserProfile | null> => {
     if (!firebaseUser) {
       setUserProfile(null);
       setIsGuest(true); // No Firebase user means guest
@@ -35,42 +36,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     setIsGuest(false); // Has Firebase user, not a guest
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    let userDocSnap = await getDoc(userDocRef);
-    let profileData: UserProfile | null = null;
 
-    if (userDocSnap.exists()) {
-      const data = userDocSnap.data();
-       // Ensure createdAt is a Date object
-       let createdAtDate = new Date(); // Default to now
-       if (data.createdAt && data.createdAt instanceof Timestamp) {
-           createdAtDate = data.createdAt.toDate();
-       }
-       profileData = {
-         uid: data.uid || firebaseUser.uid,
-         email: data.email || firebaseUser.email || '',
-         displayName: data.displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-         avatarUrl: data.avatarUrl || firebaseUser.photoURL || undefined, // Include avatarUrl
-         points: data.points ?? 0,
-         badges: Array.isArray(data.badges) ? data.badges : [],
-         createdAt: createdAtDate,
-       };
-    } else {
-      // Create a basic profile if it doesn't exist (e.g., after social sign-in)
-      console.log(`Creating new profile for user ${firebaseUser.uid}`);
-      const newProfile: UserProfile = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-        avatarUrl: firebaseUser.photoURL || undefined, // Include avatarUrl on creation
-        points: 0,
-        badges: [],
-        createdAt: new Date(), // Use JS Date directly here
-      };
-      // Ensure createdAt is Firestore Timestamp when writing
-      await setDoc(userDocRef, { ...newProfile, createdAt: Timestamp.fromDate(newProfile.createdAt) });
-      profileData = newProfile;
+    // Try fetching existing profile first
+    let profileData = await getUserProfile(firebaseUser.uid);
+
+    if (!profileData) {
+      // Create a profile if it doesn't exist (e.g., after social sign-in or first email registration)
+      console.log(`Creating new profile for user ${firebaseUser.uid} in fetchUserProfileAndSet`);
+      profileData = await createUserProfileDocument(
+          firebaseUser.uid,
+          firebaseUser.email,
+          firebaseUser.displayName,
+          firebaseUser.photoURL
+      );
     }
+
     setUserProfile(profileData);
     return profileData;
   }, []);
@@ -86,7 +66,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const guestProgress = loadGuestProgress();
     clearGuestProgress(); // Clear guest progress after loading
 
-    // 2. Fetch or create user profile
+    // 2. Fetch or create user profile (fetchUserProfileAndSet handles creation if needed)
     const profile = await fetchUserProfileAndSet(firebaseUser);
 
     // 3. Fetch existing Firestore progress
@@ -108,10 +88,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
            for (const key of mergedKeys) {
                const mergedEntry = mergedProgress[key];
                const firestoreEntry = firestoreProgress ? firestoreProgress[key] : undefined;
+                // Ensure dates are Dates before comparison
+                const mergedDate = mergedEntry.lastWatched instanceof Date ? mergedEntry.lastWatched : new Date(0);
+                const firestoreDate = firestoreEntry?.lastWatched instanceof Date ? firestoreEntry.lastWatched : new Date(0);
+
                if (!firestoreEntry ||
                    mergedEntry.watchedTime !== firestoreEntry.watchedTime ||
                    mergedEntry.completed !== firestoreEntry.completed ||
-                   mergedEntry.lastWatched.getTime() !== firestoreEntry.lastWatched.getTime()) {
+                   mergedDate.getTime() !== firestoreDate.getTime()) { // Compare timestamps
                    hasChanges = true;
                    break;
                }
@@ -120,18 +104,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
        if (hasChanges) {
            console.log("Merging guest progress into Firestore...");
+           let lastMergedUpdateDate = new Date(0); // Track the latest date from merged progress
            for (const videoId in mergedProgress) {
               const entry = mergedProgress[videoId];
-              // Ensure lastWatched is a valid Date before converting
-              const lastWatchedDate = entry.lastWatched instanceof Date ? entry.lastWatched : new Date();
-              await updateUserProgress(firebaseUser.uid, videoId, entry.watchedTime, entry.completed, lastWatchedDate);
+              // Ensure lastWatched is a valid Date before passing to updateUserProgress
+              const lastWatchedDate = entry.lastWatched instanceof Date ? entry.lastWatched : new Date(); // Default to now if invalid
+              // Intentionally DO NOT await updateUserProgress inside the loop to avoid multiple profile updates
+              // We'll update the profile once after the loop if needed
+               const progressDocRef = doc(db, 'userProgress', firebaseUser.uid);
+               const updateData: { [key: string]: any } = {};
+               updateData[`${videoId}.watchedTime`] = entry.watchedTime;
+               updateData[`${videoId}.lastWatched`] = Timestamp.fromDate(lastWatchedDate);
+               updateData[`${videoId}.completed`] = entry.completed;
+               await setDoc(progressDocRef, updateData, { merge: true }); // Update progress entry
+
+               if (lastWatchedDate.getTime() > lastMergedUpdateDate.getTime()) {
+                   lastMergedUpdateDate = lastWatchedDate;
+               }
            }
-            firestoreProgress = mergedProgress; // Update local view of Firestore progress
-            toast({
-                title: "Progress Synced",
-                description: "Your previous guest progress has been saved to your account.",
-            });
-      }
+
+           // Update user profile's lastActivityDate based on the latest merge activity if necessary
+           if (profile && (!profile.lastActivityDate || lastMergedUpdateDate.getTime() > profile.lastActivityDate.getTime())) {
+               const userDocRef = doc(db, 'users', firebaseUser.uid);
+               await updateDoc(userDocRef, { lastActivityDate: Timestamp.fromDate(lastMergedUpdateDate) });
+               // Refresh profile locally after update
+               await fetchUserProfileAndSet(firebaseUser);
+           }
+
+           firestoreProgress = mergedProgress; // Update local view of Firestore progress
+           toast({
+               title: "Progress Synced",
+               description: "Your previous guest progress has been saved to your account.",
+           });
+       }
     }
 
     setLoading(false);
@@ -162,10 +167,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log("Auth state changed. User:", firebaseUser?.uid);
       setLoading(true);
       if (firebaseUser) {
-        // Don't automatically merge here, let the explicit signIn handle it
+        // User is signed in. Fetch their profile.
+        // fetchUserProfileAndSet handles both existing and new user profile creation.
         setUser(firebaseUser);
         await fetchUserProfileAndSet(firebaseUser);
       } else {
+        // User is signed out. Reset state to guest.
         setUser(null);
         setUserProfile(null);
         setIsGuest(true);
@@ -174,7 +181,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfileAndSet]);
+  }, [fetchUserProfileAndSet]); // Dependency on fetchUserProfileAndSet
 
 
   // Function to manually refresh user profile data
