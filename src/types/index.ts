@@ -1,4 +1,5 @@
 
+
 export interface UserProfile {
   uid: string;
   email: string;
@@ -27,22 +28,41 @@ export interface UserProgress {
 // --- Content Structure ---
 
 export interface ContentItem {
-  id: string;
+  id: string; // Unique ID for the video (could be YouTube ID)
   title: string;
-  url: string;
+  url: string; // Embed URL
   duration: number; // Duration in seconds
   description?: string; // Optional description
+  playlistId: string; // ID of the playlist this video belongs to
 }
 
 export type PlaylistType = 'html' | 'css' | 'javascript';
 
-export interface Playlist {
-  id: PlaylistType;
-  title: string;
-  description: string;
-  videos: ContentItem[];
-  icon: React.ElementType; // Icon component
+// Summary used for browsing playlists
+export interface PlaylistSummary {
+    id: string; // Unique ID for the playlist (e.g., 'html-fcc-full')
+    title: string;
+    category: PlaylistType;
+    description?: string;
+    creator?: string; // Optional: Name of the content creator/channel
+    // Add other summary fields if needed, e.g., total duration approximation
 }
+
+// Full playlist details including videos (used when a playlist is selected)
+export interface Playlist extends PlaylistSummary {
+  videos: ContentItem[];
+}
+
+// Structure to hold all playlists categorized
+export interface PlaylistCollection {
+    [category: string]: PlaylistSummary[]; // Category maps to array of playlist summaries
+}
+
+// Structure to hold all videos indexed by playlist ID
+export interface VideoCollection {
+    [playlistId: string]: ContentItem[];
+}
+
 
 // --- Leaderboard ---
 export interface LeaderboardEntry {
@@ -64,14 +84,19 @@ export interface BadgeDetails {
 
 // Define specific badge IDs
 export const BADGE_IDS = {
-    HTML_MASTER: 'html-master',
-    CSS_STYLIST: 'css-stylist',
-    JS_NINJA: 'javascript-ninja',
+    HTML_MASTER: 'html-master', // Example: Completed a specific core HTML playlist
+    CSS_STYLIST: 'css-stylist', // Example: Completed a specific core CSS playlist
+    JS_NINJA: 'javascript-ninja', // Example: Completed a specific core JS playlist
     STREAK_3: 'streak-3-days',
     STREAK_7: 'streak-7-days',
     STREAK_30: 'streak-30-days',
-    TRIFECTA: 'trifecta-completed', // Completed all playlists
+    TRIFECTA: 'trifecta-completed', // Example: Completed all *core* playlists
+    // Add more specific badges, e.g., 'flexbox-pro', 'grid-guru', 'async-ace'
+    PLAYLIST_COMPLETE_PREFIX: 'playlist-complete-', // Prefix for dynamic playlist completion badges
 } as const;
 
-export type BadgeId = typeof BADGE_IDS[keyof typeof BADGE_IDS];
-
+// Combine known badge IDs with potential dynamic ones
+export type KnownBadgeId = typeof BADGE_IDS[keyof typeof BADGE_IDS];
+export type DynamicBadgeId = `${typeof BADGE_IDS.PLAYLIST_COMPLETE_PREFIX}${string}`;
+export type BadgeId = KnownBadgeId | DynamicBadgeId;
+```

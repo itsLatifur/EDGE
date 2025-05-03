@@ -1,21 +1,31 @@
+
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, setDoc, updateDoc, Timestamp, increment, FieldValue, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import type { UserProgress, UserProgressEntry, UserProfile, LeaderboardEntry, PlaylistType, BadgeId } from '@/types';
+import type { UserProgress, UserProgressEntry, UserProfile, LeaderboardEntry, PlaylistType, BadgeId, DynamicBadgeId, KnownBadgeId } from '@/types';
 import { BADGE_IDS } from '@/types'; // Import BADGE_IDS
-import { mockPlaylists } from '@/lib/data/playlists'; // Needed for Trifecta badge check
+import { playlistCategories, playlistVideos, findPlaylistSummary, getPlaylistDetails } from '@/lib/data/playlists'; // Needed for badge checks
 
 const GUEST_PROGRESS_KEY = 'selfLearnGuestProgress';
 
 // --- Helper functions for Dates ---
 const isSameDay = (date1: Date, date2: Date): boolean => {
+    if (!(date1 instanceof Date) || !(date2 instanceof Date) || isNaN(date1.getTime()) || isNaN(date2.getTime())) {
+        return false; // Handle invalid dates
+    }
     return date1.getFullYear() === date2.getFullYear() &&
            date1.getMonth() === date2.getMonth() &&
            date1.getDate() === date2.getDate();
 };
 
 const isConsecutiveDay = (date1: Date, date2: Date): boolean => {
+    if (!(date1 instanceof Date) || !(date2 instanceof Date) || isNaN(date1.getTime()) || isNaN(date2.getTime())) {
+        return false; // Handle invalid dates
+    }
     const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
-    const diffDays = Math.round(Math.abs((date1.getTime() - date2.getTime()) / oneDay));
+    // Calculate difference in days based on UTC midnight
+    const startOfDate1 = Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate());
+    const startOfDate2 = Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate());
+    const diffDays = Math.round((startOfDate2 - startOfDate1) / oneDay);
     return diffDays === 1;
 };
 
@@ -26,31 +36,26 @@ export const loadGuestProgress = (): UserProgress | null => {
   try {
     const storedProgress = localStorage.getItem(GUEST_PROGRESS_KEY);
     if (storedProgress) {
-        const progress = JSON.parse(storedProgress) as UserProgress;
-        // Ensure lastWatched are Date objects
-        for (const videoId in progress) {
-             if (progress[videoId].lastWatched && !(progress[videoId].lastWatched instanceof Date)) {
-                // Attempt conversion from ISO string or number (timestamp)
-                let dateValue = progress[videoId].lastWatched;
-                if (typeof dateValue === 'string' || typeof dateValue === 'number') {
-                    const parsedDate = new Date(dateValue);
-                    // Check if parsing was successful
-                    if (!isNaN(parsedDate.getTime())) {
-                        progress[videoId].lastWatched = parsedDate;
-                    } else {
-                        console.warn(`Could not parse lastWatched date for video ${videoId} from localStorage:`, dateValue);
-                        // Fallback: Set to epoch or current time? For simplicity, keep as is or set to now
-                        progress[videoId].lastWatched = new Date(0); // Set to epoch if invalid
-                    }
-                } else {
-                     console.warn(`Invalid type for lastWatched date for video ${videoId} from localStorage:`, dateValue);
-                     progress[videoId].lastWatched = new Date(0); // Set to epoch if invalid type
-                }
-             } else if (!progress[videoId].lastWatched) {
-                 // If lastWatched is missing or null, set to epoch
-                 progress[videoId].lastWatched = new Date(0);
-             }
+        const progressRaw = JSON.parse(storedProgress);
+        const progress: UserProgress = {};
+        for (const videoId in progressRaw) {
+            const entry = progressRaw[videoId];
+            let lastWatchedDate = new Date(0); // Default to epoch
+            if (entry.lastWatched) {
+                 const parsedDate = new Date(entry.lastWatched); // Try parsing ISO string or timestamp number
+                 if (!isNaN(parsedDate.getTime())) {
+                     lastWatchedDate = parsedDate;
+                 } else {
+                      console.warn(`Could not parse guest lastWatched date for video ${videoId}:`, entry.lastWatched);
+                 }
+            }
+             progress[videoId] = {
+                watchedTime: entry.watchedTime ?? 0,
+                lastWatched: lastWatchedDate,
+                completed: entry.completed ?? false,
+            };
         }
+        console.log("Loaded guest progress:", progress);
         return progress;
     }
   } catch (error) {
@@ -67,12 +72,14 @@ export const saveGuestProgress = (progress: UserProgress): void => {
     for (const videoId in progress) {
         serializableProgress[videoId] = {
             ...progress[videoId],
-            lastWatched: progress[videoId].lastWatched instanceof Date
+            // Only convert valid Date objects, otherwise store null or a default
+            lastWatched: progress[videoId].lastWatched instanceof Date && !isNaN(progress[videoId].lastWatched.getTime())
                 ? progress[videoId].lastWatched.toISOString()
-                : new Date().toISOString(), // Fallback to current time if invalid
+                : null,
         };
     }
     localStorage.setItem(GUEST_PROGRESS_KEY, JSON.stringify(serializableProgress));
+     console.log("Saved guest progress:", serializableProgress);
   } catch (error) {
     console.error("Error saving guest progress to local storage:", error);
   }
@@ -82,7 +89,7 @@ export const updateGuestProgressEntry = (videoId: string, watchedTime: number, i
     const currentProgress = loadGuestProgress() || {};
     currentProgress[videoId] = {
         watchedTime,
-        lastWatched: new Date(),
+        lastWatched: new Date(), // Update with current timestamp
         completed: isCompleted,
     };
     saveGuestProgress(currentProgress);
@@ -93,6 +100,7 @@ export const clearGuestProgress = (): void => {
    if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(GUEST_PROGRESS_KEY);
+    console.log("Cleared guest progress from local storage.");
   } catch (error) {
     console.error("Error clearing guest progress from local storage:", error);
   }
@@ -134,8 +142,8 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
         }
     } catch (error) {
          console.error(`Error fetching profile for user ${userId}:`, error);
+         throw error; // Re-throw error for upstream handling
     }
-    return null;
 };
 
 
@@ -163,16 +171,17 @@ export const getUserProgress = async (userId: string): Promise<UserProgress | nu
         return progress;
       } else {
           // No progress doc exists, return empty object
+          console.log(`No progress document found for user ${userId}. Returning empty progress.`);
           return {};
       }
   } catch(error) {
       console.error(`Error fetching Firestore progress for user ${userId}:`, error);
+      throw error; // Re-throw error
   }
-  return null; // Return null on error
 };
 
 
-// Update user progress AND profile (for streaks)
+// Update user progress AND profile (for streaks, points, badges)
 export const updateUserProgress = async (
     userId: string,
     videoId: string,
@@ -186,6 +195,7 @@ export const updateUserProgress = async (
     const userDocRef = doc(db, 'users', userId);
     let pointsAwarded = 0;
     let badgesAwarded: BadgeId[] = [];
+    let newBadges: BadgeId[] = []; // Track only newly awarded badges in this update
 
     const progressUpdateData: { [key: string]: any } = {};
     const fieldPathPrefix = `${videoId}`;
@@ -194,20 +204,26 @@ export const updateUserProgress = async (
     progressUpdateData[`${fieldPathPrefix}.completed`] = isCompleted;
 
     try {
-        // Fetch current profile for streak calculation
+        // Use setDoc with merge: true for progress to handle creation/update atomically
+        await setDoc(progressDocRef, progressUpdateData, { merge: true });
+
+        // Fetch current profile for streak, points, and badges calculation
         const userProfile = await getUserProfile(userId);
         if (!userProfile) {
-            console.warn(`Cannot update progress/streaks for non-existent profile: ${userId}`);
+            console.warn(`Cannot update progress/streaks for non-existent profile: ${userId}. Progress saved, but profile update skipped.`);
             return { pointsAwarded: 0, badgesAwarded: [] };
         }
 
-        // Use setDoc with merge: true for progress to handle creation/update
-        await setDoc(progressDocRef, progressUpdateData, { merge: true });
+        // Fetch current progress to check previous completion status
+        const previousProgress = await getUserProgress(userId); // Fetch *after* saving current update
+        const wasPreviouslyCompleted = previousProgress?.[videoId]?.completed || false;
+
+        const profileUpdateData: { [key: string]: any } = {};
 
         // --- Streak Calculation ---
-        const profileUpdateData: { [key: string]: any } = {};
         let currentStreak = userProfile.currentStreak || 0;
         let longestStreak = userProfile.longestStreak || 0;
+        let activityDateChanged = false;
 
         if (userProfile.lastActivityDate) {
             if (!isSameDay(userProfile.lastActivityDate, lastWatchedDate)) {
@@ -216,174 +232,229 @@ export const updateUserProgress = async (
                 } else {
                     currentStreak = 1; // Streak broken, reset to 1 for today's activity
                 }
+                activityDateChanged = true;
             }
-            // If it's the same day, streak doesn't change
+            // If it's the same day, streak doesn't change, but update lastActivityDate to current time
+            else if (lastWatchedDate.getTime() > userProfile.lastActivityDate.getTime()){
+                 activityDateChanged = true; // Update timestamp even if same day
+            }
         } else {
             currentStreak = 1; // First activity ever
+            activityDateChanged = true;
         }
 
         if (currentStreak > longestStreak) {
             longestStreak = currentStreak;
         }
 
-        // Only update profile if streak or last activity date changed
-        if (currentStreak !== userProfile.currentStreak || longestStreak !== userProfile.longestStreak || !userProfile.lastActivityDate || !isSameDay(userProfile.lastActivityDate, lastWatchedDate)) {
-            profileUpdateData.currentStreak = currentStreak;
-            profileUpdateData.longestStreak = longestStreak;
-            profileUpdateData.lastActivityDate = Timestamp.fromDate(lastWatchedDate); // Update last activity date
-            await updateDoc(userDocRef, profileUpdateData);
-            console.log(`User ${userId} streak updated: Current ${currentStreak}, Longest ${longestStreak}`);
+        // Add streak/date updates to profileUpdateData if changed
+        if (currentStreak !== userProfile.currentStreak) profileUpdateData.currentStreak = currentStreak;
+        if (longestStreak !== userProfile.longestStreak) profileUpdateData.longestStreak = longestStreak;
+        if (activityDateChanged) profileUpdateData.lastActivityDate = Timestamp.fromDate(lastWatchedDate);
 
-             // Award streak badges
-             if (currentStreak >= 3 && !userProfile.badges.includes(BADGE_IDS.STREAK_3)) badgesAwarded.push(BADGE_IDS.STREAK_3);
-             if (currentStreak >= 7 && !userProfile.badges.includes(BADGE_IDS.STREAK_7)) badgesAwarded.push(BADGE_IDS.STREAK_7);
-             if (currentStreak >= 30 && !userProfile.badges.includes(BADGE_IDS.STREAK_30)) badgesAwarded.push(BADGE_IDS.STREAK_30);
-        }
 
-        // Award points if the video is newly completed
-        const previousProgress = await getUserProgress(userId);
-        const wasPreviouslyCompleted = previousProgress?.[videoId]?.completed || false;
+        // --- Award Points ---
         if (isCompleted && !wasPreviouslyCompleted) {
             pointsAwarded = 10; // Example points
-            await awardPoints(userId, pointsAwarded);
+            profileUpdateData.points = increment(pointsAwarded);
+            console.log(`Awarding ${pointsAwarded} points to user ${userId} for completing video ${videoId}`);
         }
 
-        // Award playlist and trifecta badges if applicable (re-fetch progress after update)
-         if (isCompleted) {
-            const updatedProgress = await getUserProgress(userId); // Fetch latest progress
-            if (updatedProgress) {
-                const badgeCheckResult = await checkAndAwardCompletionBadges(userId, userProfile.badges, updatedProgress);
-                badgesAwarded = [...badgesAwarded, ...badgeCheckResult];
-            }
-         }
+        // --- Award Badges ---
+        const currentBadges = userProfile.badges || [];
 
-        // Apply newly awarded badges
-        if (badgesAwarded.length > 0) {
-            const uniqueNewBadges = badgesAwarded.filter(badge => !userProfile.badges.includes(badge));
-            if (uniqueNewBadges.length > 0) {
-                 await updateDoc(userDocRef, {
-                     badges: [...userProfile.badges, ...uniqueNewBadges]
-                 });
-                 console.log(`Awarded new badges: ${uniqueNewBadges.join(', ')} to user ${userId}`);
-            }
+        // Streak Badges
+        if (currentStreak >= 3 && !currentBadges.includes(BADGE_IDS.STREAK_3)) newBadges.push(BADGE_IDS.STREAK_3);
+        if (currentStreak >= 7 && !currentBadges.includes(BADGE_IDS.STREAK_7)) newBadges.push(BADGE_IDS.STREAK_7);
+        if (currentStreak >= 30 && !currentBadges.includes(BADGE_IDS.STREAK_30)) newBadges.push(BADGE_IDS.STREAK_30);
+
+        // Completion Badges (only check if video was newly completed)
+        if (isCompleted && !wasPreviouslyCompleted) {
+            const completionBadges = await checkAndAwardCompletionBadges(userId, currentBadges, previousProgress || {}, videoId); // Pass previousProgress
+            newBadges.push(...completionBadges);
         }
 
-        return { pointsAwarded, badgesAwarded: uniqueNewBadges }; // Return only newly awarded badges
+        // Filter out duplicates within newBadges (though logic should prevent this)
+        newBadges = [...new Set(newBadges)];
+
+        // Add new badges to profile update if any exist
+        if (newBadges.length > 0) {
+            profileUpdateData.badges = FieldValue.arrayUnion(...newBadges);
+            console.log(`Awarding new badges: ${newBadges.join(', ')} to user ${userId}`);
+        }
+
+        // Update profile document only if there are changes
+        if (Object.keys(profileUpdateData).length > 0) {
+            await updateDoc(userDocRef, profileUpdateData);
+            console.log(`User profile updated for ${userId}:`, profileUpdateData);
+        }
+
+        return { pointsAwarded, badgesAwarded: newBadges }; // Return only newly awarded badges
 
     } catch (error) {
         console.error(`Error updating Firestore progress/profile for user ${userId}, video ${videoId}:`, error);
-        throw error;
+        throw error; // Re-throw for upstream handling
     }
 };
 
 // Helper to check for playlist completion and award badges
-const checkAndAwardCompletionBadges = async (userId: string, currentBadges: BadgeId[], userProgress: UserProgress): Promise<BadgeId[]> => {
+const checkAndAwardCompletionBadges = async (userId: string, currentBadges: BadgeId[], userProgress: UserProgress, completedVideoId: string): Promise<BadgeId[]> => {
     let awardedBadges: BadgeId[] = [];
-    let allPlaylistsCompleted = true;
 
-    for (const playlistId in mockPlaylists) {
-        const typedPlaylistId = playlistId as PlaylistType;
-        const playlist = mockPlaylists[typedPlaylistId];
-        const badgeId = (BADGE_IDS as Record<string, BadgeId>)[`${typedPlaylistId.toUpperCase()}_MASTER`] || (BADGE_IDS as Record<string, BadgeId>)[`${typedPlaylistId.toUpperCase()}_STYLIST`] || (BADGE_IDS as Record<string, BadgeId>)[`${typedPlaylistId.toUpperCase()}_NINJA`]; // Map playlist ID to badge ID
+    // Find the playlist the completed video belongs to
+    const videoDetails = findVideoDetails(completedVideoId);
+    if (!videoDetails) return awardedBadges; // Should not happen if called correctly
 
-        if (badgeId && !currentBadges.includes(badgeId)) {
-            const playlistComplete = playlist.videos.every(v => userProgress[v.id]?.completed);
-            if (playlistComplete) {
-                awardedBadges.push(badgeId);
-            } else {
-                allPlaylistsCompleted = false; // If any playlist is not complete
+    const playlistId = videoDetails.playlistId;
+    const playlist = getPlaylistDetails(playlistId);
+    if (!playlist) return awardedBadges;
+
+    // Check if this specific playlist is now complete
+    const playlistBadgeId: DynamicBadgeId = `${BADGE_IDS.PLAYLIST_COMPLETE_PREFIX}${playlistId}`;
+    const isPlaylistNewlyCompleted = !currentBadges.includes(playlistBadgeId) &&
+                                    playlist.videos.every(v => userProgress[v.id]?.completed || v.id === completedVideoId); // Check completion including the current video
+
+    if (isPlaylistNewlyCompleted) {
+        awardedBadges.push(playlistBadgeId);
+        console.log(`Playlist "${playlist.title}" completed by user ${userId}. Awarding badge ${playlistBadgeId}.`);
+    }
+
+    // Check for CORE playlist completion badges (HTML_MASTER, CSS_STYLIST, JS_NINJA)
+    // Define which playlist IDs correspond to core badges
+    const corePlaylistMap: Partial<Record<PlaylistType, BadgeId>> = {
+        html: BADGE_IDS.HTML_MASTER,
+        css: BADGE_IDS.CSS_STYLIST,
+        javascript: BADGE_IDS.JS_NINJA,
+    };
+    // Example: Assume first playlist in each category is the "core" one
+    const corePlaylistIds = {
+        html: playlistCategories.html[0]?.id,
+        css: playlistCategories.css[0]?.id,
+        javascript: playlistCategories.javascript[0]?.id,
+    };
+
+    const coreBadgeId = corePlaylistMap[playlist.category];
+    const isCorePlaylist = playlist.id === corePlaylistIds[playlist.category];
+
+    if (coreBadgeId && isCorePlaylist && isPlaylistNewlyCompleted && !currentBadges.includes(coreBadgeId)) {
+         awardedBadges.push(coreBadgeId);
+         console.log(`Core Playlist "${playlist.title}" completed. Awarding badge ${coreBadgeId}.`);
+    }
+
+
+    // Check for Trifecta badge (completion of all *core* playlists)
+    let allCorePlaylistsCompleted = true;
+    for (const category in corePlaylistIds) {
+        const cat = category as PlaylistType;
+        const coreId = corePlaylistIds[cat];
+        const coreBadge = corePlaylistMap[cat];
+
+        if (coreId && coreBadge) {
+            // Check if user has the badge OR if the playlist is now complete (including current video)
+            if (!currentBadges.includes(coreBadge) && !awardedBadges.includes(coreBadge)) { // If user doesn't have badge and isn't getting it now
+                 // Check if *this* core playlist is complete based on progress
+                 const corePlaylistDetails = getPlaylistDetails(coreId);
+                 if (corePlaylistDetails) {
+                     const coreComplete = corePlaylistDetails.videos.every(v => userProgress[v.id]?.completed || v.id === completedVideoId);
+                     if (!coreComplete) {
+                         allCorePlaylistsCompleted = false;
+                         break;
+                     }
+                 } else {
+                     allCorePlaylistsCompleted = false; // Cannot verify if core playlist doesn't exist
+                     break;
+                 }
             }
-        } else if (!badgeId) {
-             console.warn(`No badge ID defined for playlist: ${playlistId}`);
-             // Decide if missing badge definition means playlist completion doesn't count towards trifecta
-             const playlistComplete = playlist.videos.every(v => userProgress[v.id]?.completed);
-             if(!playlistComplete) allPlaylistsCompleted = false;
-        } else if (!currentBadges.includes(badgeId)) {
-             // Badge exists but user doesn't have it, check if playlist is complete
-             const playlistComplete = playlist.videos.every(v => userProgress[v.id]?.completed);
-             if (!playlistComplete) allPlaylistsCompleted = false;
+        } else {
+            allCorePlaylistsCompleted = false; // If any core playlist/badge is undefined
+            break;
         }
-        // If user already has the badge, we assume the playlist is complete for trifecta check
     }
 
-    // Check for Trifecta badge
-    if (allPlaylistsCompleted && !currentBadges.includes(BADGE_IDS.TRIFECTA)) {
-        awardedBadges.push(BADGE_IDS.TRIFECTA);
+
+    if (allCorePlaylistsCompleted && !currentBadges.includes(BADGE_IDS.TRIFECTA)) {
+         // Check one last time to ensure all core badges are present or newly awarded
+         const hasAllCoreBadges = Object.values(corePlaylistMap).every(badge =>
+             currentBadges.includes(badge) || awardedBadges.includes(badge)
+         );
+         if (hasAllCoreBadges) {
+            awardedBadges.push(BADGE_IDS.TRIFECTA);
+            console.log(`All core playlists completed. Awarding Trifecta badge.`);
+         }
     }
 
-    return awardedBadges;
+    return [...new Set(awardedBadges)]; // Return unique new badges
 };
+
 
 // --- Merging Logic ---
 
 export const mergeProgress = (firestoreProgress: UserProgress, guestProgress: UserProgress): UserProgress => {
   const merged: UserProgress = { ...firestoreProgress };
 
+  console.log("Starting merge. Firestore:", firestoreProgress, "Guest:", guestProgress);
+
   for (const videoId in guestProgress) {
     const guestEntry = guestProgress[videoId];
     const firestoreEntry = firestoreProgress[videoId];
 
     // Ensure guest entry's lastWatched is a valid Date object
-    const guestLastWatched = guestEntry.lastWatched instanceof Date ? guestEntry.lastWatched : new Date(0); // Default to epoch if invalid
+    const guestLastWatched = guestEntry.lastWatched instanceof Date && !isNaN(guestEntry.lastWatched.getTime())
+                               ? guestEntry.lastWatched
+                               : new Date(0); // Default to epoch if invalid
 
-    // Prioritize completed status: If guest is complete and Firestore isn't, take guest.
+    console.log(`Merging video ${videoId}: Guest watchedTime=${guestEntry.watchedTime}, completed=${guestEntry.completed}, lastWatched=${guestLastWatched.toISOString()}`);
+    if (firestoreEntry) {
+         console.log(`Firestore entry exists: watchedTime=${firestoreEntry.watchedTime}, completed=${firestoreEntry.completed}, lastWatched=${firestoreEntry.lastWatched.toISOString()}`);
+    } else {
+         console.log(`No Firestore entry for video ${videoId}.`);
+    }
+
+
+    // Priority 1: If guest is complete and Firestore isn't, take guest.
     if (guestEntry.completed && (!firestoreEntry || !firestoreEntry.completed)) {
         merged[videoId] = { ...guestEntry, lastWatched: guestLastWatched };
+        console.log(` -> Merged ${videoId}: Guest completed, Firestore not. Taking guest.`);
         continue; // Move to next videoId
     }
 
-    // If Firestore is complete, keep it (unless guest is also complete AND somehow more recent - unlikely needed)
+    // Priority 2: If Firestore is complete, keep it (unless guest is somehow more recent AND complete?)
     if (firestoreEntry && firestoreEntry.completed) {
-        continue; // Keep firestore completed entry
+        // Optional: Update timestamp if guest is also complete and more recent?
+        if (guestEntry.completed && guestLastWatched.getTime() > firestoreEntry.lastWatched.getTime()) {
+            merged[videoId] = { ...guestEntry, lastWatched: guestLastWatched };
+             console.log(` -> Merged ${videoId}: Both completed, guest more recent. Updating timestamp.`);
+        } else {
+             console.log(` -> Merged ${videoId}: Firestore completed. Keeping Firestore.`);
+        }
+        continue; // Keep Firestore completed entry (or updated timestamp)
     }
 
-    // If neither is complete, take the one with the later lastWatched date.
+    // Priority 3: If neither is complete, take the one with the later lastWatched date.
     // Also takes guest entry if firestore entry doesn't exist.
     if (!firestoreEntry || guestLastWatched.getTime() > firestoreEntry.lastWatched.getTime()) {
         merged[videoId] = { ...guestEntry, lastWatched: guestLastWatched };
+        console.log(` -> Merged ${videoId}: Neither complete, guest more recent (or Firestore missing). Taking guest.`);
+    } else {
+        console.log(` -> Merged ${videoId}: Neither complete, Firestore more recent or same. Keeping Firestore.`);
+        // If firestore timestamp is later or equal, keep the firestore entry (already in `merged`)
     }
-    // If firestore timestamp is later or equal, keep the firestore entry (already in `merged`)
   }
-
+  console.log("Merge complete. Result:", merged);
   return merged;
 };
 
 
-// --- Gamification Firestore Functions ---
+// --- Gamification Firestore Functions --- (Keep internal for now)
 
-// Award points to a user (Now internal, called by updateUserProgress)
+// Award points to a user
 const awardPoints = async (userId: string, points: number): Promise<void> => {
-  if (!userId || points <= 0) return;
-  const userDocRef = doc(db, 'users', userId);
-   try {
-       await updateDoc(userDocRef, {
-           points: increment(points)
-       });
-       console.log(`Awarded ${points} points to user ${userId}`);
-   } catch(error) {
-       console.error(`Error awarding points to user ${userId}:`, error);
-       // Profile should exist if updateUserProgress called this
-   }
+  // This is now handled within updateUserProgress using increment
 };
 
-// Award a badge to a user (Now internal, called by updateUserProgress)
+// Award a badge to a user
 const awardBadge = async (userId: string, badgeId: BadgeId): Promise<void> => {
-  if (!userId || !badgeId) return;
-  const userDocRef = doc(db, 'users', userId);
-
-  try {
-      // Fetch fresh data before updating to avoid race conditions if needed,
-      // but updateUserProgress already passes current badges.
-      // We'll trust the logic in updateUserProgress to prevent duplicates for now.
-       await updateDoc(userDocRef, {
-         badges: FieldValue.arrayUnion(badgeId) // Use arrayUnion for safety
-       });
-       console.log(`Awarded badge "${badgeId}" to user ${userId}`);
-
-  } catch(error) {
-       console.error(`Error awarding badge ${badgeId} to user ${userId}:`, error);
-       // Profile should exist
-  }
+  // This is now handled within updateUserProgress using arrayUnion
 };
 
 
@@ -440,7 +511,13 @@ export const createUserProfileDocument = async (uid: string, email: string | nul
         lastActivityDate: null, // Store null initially
     };
 
-    await setDoc(userDocRef, firestoreData);
-    console.log(`Created profile for new user ${uid}`);
-    return newProfile; // Return the profile object with JS Dates
+    try {
+        await setDoc(userDocRef, firestoreData);
+        console.log(`Created profile for new user ${uid}`);
+        return newProfile; // Return the profile object with JS Dates
+    } catch (error) {
+        console.error(`Error creating profile for user ${uid}:`, error);
+        throw error; // Re-throw error
+    }
 };
+```
