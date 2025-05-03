@@ -59,7 +59,6 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null);
   const [activeVideoStartTime, setActiveVideoStartTime] = useState<number>(0);
   const [isVideoLoading, setIsVideoLoading] = useState(true); // State for video iframe loading
-  const [isPlaylistVisible, setIsPlaylistVisible] = useState(true); // Control playlist visibility on smaller screens maybe?
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastReportedTimeRef = useRef<number>(0); // Track last reported time to reduce updates
@@ -68,6 +67,9 @@ const LearningContent: React.FC<LearningContentProps> = ({
   // Determine the initial/active video based on type and props
   useEffect(() => {
     setIsVideoLoading(true); // Assume loading when dependencies change
+    let videoToPlay: ContentItem | null = null;
+    let startTime = 0; // Declare startTime here with default value
+
     if (type === 'playlist' && playlist.length > 0) {
       // Find the most recently watched video within *this* playlist
       const playlistVideoIds = new Set(playlist.map(v => v.id));
@@ -75,16 +77,13 @@ const LearningContent: React.FC<LearningContentProps> = ({
         .filter(([videoId, data]) => playlistVideoIds.has(videoId) && data?.lastWatched instanceof Date) // Ensure valid date
         .sort(([, a], [, b]) => b.lastWatched.getTime() - a.lastWatched.getTime());
 
-      let videoToPlay: ContentItem | null = null;
-      let startTime = 0;
-
       if (recentHistoryInPlaylist.length > 0) {
           const [latestVideoId, latestData] = recentHistoryInPlaylist[0];
           const videoDetails = playlist.find(v => v.id === latestVideoId);
           // Only resume if not fully watched (e.g., less than 98% watched for buffer)
           if (videoDetails && latestData.watchedTime < videoDetails.duration * 0.98) {
               videoToPlay = videoDetails;
-              startTime = latestData.watchedTime;
+              startTime = latestData.watchedTime; // Update startTime
           }
       }
 
@@ -94,7 +93,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
               (item) => !userHistory[item.id] || (item.duration > 0 && userHistory[item.id].watchedTime < item.duration * 0.98)
           );
           videoToPlay = firstUnwatched || playlist[0]; // Fallback to the very first video
-          startTime = userHistory[videoToPlay.id]?.watchedTime || 0;
+          startTime = userHistory[videoToPlay.id]?.watchedTime || 0; // Update startTime
       }
 
       setActiveVideo(videoToPlay);
@@ -360,7 +359,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
            </TooltipProvider>
          );
        });
-   }, [playlist, activeVideo, userHistory, getVideoProgress, getWatchedTime, getThumbnailHint, handlePlaylistItemClick]);
+   }, [playlist, activeVideo, userHistory, getVideoProgress, getWatchedTime, getThumbnailHint, handlePlaylistItemClick, handleIframeLoad]);
 
 
   return (
@@ -387,7 +386,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
         <div className="flex flex-col md:flex-row">
 
           {/* Video Player Area */}
-          <div className="w-full md:w-[calc(100%-20rem)] lg:w-[calc(100%-24rem)] aspect-video bg-gradient-to-br from-muted/50 to-muted relative group"> {/* Use remaining width on larger screens */}
+          <div className="w-full md:flex-grow aspect-video bg-gradient-to-br from-muted/50 to-muted relative group"> {/* Use flex-grow */}
             {/* Loading State Overlay */}
             {isVideoLoading && activeVideo && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10">
@@ -423,7 +422,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
           {/* Playlist Area (Right on Desktop, Bottom on Mobile) */}
           {type === 'playlist' && playlist.length > 0 && (
-            <div className="w-full md:w-80 lg:w-96 border-t md:border-t-0 md:border-l bg-background md:bg-muted/20 flex flex-col">
+            <div className="w-full md:w-80 lg:w-96 border-t md:border-t-0 md:border-l bg-background md:bg-muted/20 flex flex-col flex-shrink-0"> {/* Add flex-shrink-0 */}
                <ScrollArea className="flex-grow h-[50vh] md:h-[calc(100%-0px)]"> {/* Fill height */}
                  <div className="p-2 space-y-1.5">
                      {renderedPlaylistItems}
