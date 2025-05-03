@@ -45,7 +45,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const {toast} = useToast();
   const [userHistory, setUserHistory] = useState<Record<string, {watchedTime: number; lastWatched: Date}>>({});
-  const [continueWatching, setContinueWatching] = useState<{id: string; title: string; url: string; startTime: number, duration: number, description?: string} | null>(null);
+  // Removed continueWatching state as it's handled within LearningContent
 
   useEffect(() => {
     // Simulate loading time
@@ -76,38 +76,7 @@ export default function Home() {
   }, [toast]);
 
 
-  useEffect(() => {
-    // Determine "Continue Watching" item based on the most recently watched video
-    if (Object.keys(userHistory).length > 0) {
-      const sortedHistory = Object.entries(userHistory)
-        .filter(([, data]) => data.lastWatched instanceof Date) // Ensure lastWatched is a Date
-        .sort(
-          ([, a], [, b]) => b.lastWatched.getTime() - a.lastWatched.getTime()
-        );
-
-      if (sortedHistory.length > 0) {
-        const [latestVideoId, latestData] = sortedHistory[0];
-        const videoDetails = findVideoDetails(latestVideoId);
-
-        if (videoDetails && latestData.watchedTime < videoDetails.duration) { // Only suggest if not fully watched
-          setContinueWatching({
-            id: latestVideoId,
-            title: videoDetails.title,
-            url: `${videoDetails.url}?start=${Math.floor(latestData.watchedTime)}`, // Add start time parameter
-            startTime: latestData.watchedTime,
-            duration: videoDetails.duration,
-            description: videoDetails.description,
-          });
-        } else {
-           setContinueWatching(null); // Reset if fully watched or no history/details
-        }
-      } else {
-         setContinueWatching(null); // Reset if no valid history entries
-      }
-    } else {
-        setContinueWatching(null); // Reset if no history
-    }
-  }, [userHistory]);
+  // Removed useEffect for setting continueWatching
 
   const handleProgressUpdate = (videoId: string, currentTime: number) => {
      setUserHistory(prevHistory => {
@@ -137,28 +106,15 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="space-y-8 mt-8">
-        {/* Skeleton for Continue Watching */}
-         <Card className="mb-8">
-            <CardHeader>
-                <Skeleton className="h-6 w-1/3 mb-2" />
-                <Skeleton className="h-4 w-2/3" />
-            </CardHeader>
-            <CardContent>
-                 <Skeleton className="h-64 w-full" />
-            </CardContent>
-        </Card>
-
         {/* Skeleton for Tabs */}
-        <Skeleton className="h-10 w-full rounded-md mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           <div className="md:col-span-2">
-             <Skeleton className="aspect-video w-full mb-4" />
-           </div>
-           <div className="md:col-span-1 space-y-2">
-             <Skeleton className="h-16 w-full" />
-             <Skeleton className="h-16 w-full" />
-             <Skeleton className="h-16 w-full" />
-           </div>
+        <Skeleton className="h-10 w-1/3 rounded-md mb-6" />
+        {/* Skeleton for Video Player Area */}
+        <Skeleton className="aspect-video w-full mb-4" />
+        {/* Skeleton for Playlist Items */}
+        <div className="space-y-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
         </div>
       </div>
     );
@@ -166,41 +122,12 @@ export default function Home() {
 
   return (
     <div className="animate-fadeIn space-y-8 mt-8">
-        {/* Explanation for potential two video sections */}
-        {/* The "Continue Watching" card below shows your most recently viewed video for quick access. */}
-        {/* The main area below it contains the full learning paths for HTML, CSS, and JavaScript. */}
-
-        {continueWatching && (
-          <Card className="mb-8 bg-card border border-border shadow-md transition-all duration-300 hover:shadow-lg overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-primary flex items-center gap-2">
-                <PlayCircle className="h-5 w-5" />
-                Continue Watching: {continueWatching.title}
-              </CardTitle>
-              {continueWatching.description && (
-                  <CardDescription>{continueWatching.description}</CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
-               <LearningContent
-                  title={continueWatching.title}
-                  type="video"
-                  url={continueWatching.url} // URL already includes start time
-                  videoId={continueWatching.id}
-                  initialStartTime={continueWatching.startTime}
-                  onProgressUpdate={handleProgressUpdate}
-                  playlist={[]} // Not part of a specific tab playlist here
-                  userHistory={userHistory}
-                  isContinueWatching={true}
-                  videoDetails={continueWatching} // Pass full details including duration
-                />
-            </CardContent>
-          </Card>
-        )}
-
+      {/* Explanation for potential two video sections removed */}
+      {/* The "Continue Watching" card concept is integrated into the playlist now. */}
+      {/* The currently selected video (or the next suggested one) appears above the playlist. */}
 
       <Tabs defaultValue="html" className="w-full">
-        {/* TabsList is now standard, not sticky */}
+        {/* TabsList remains standard */}
         <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-muted">
           <TabsTrigger value="html" className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md">
             <Code className="h-4 w-4 mr-2" />
