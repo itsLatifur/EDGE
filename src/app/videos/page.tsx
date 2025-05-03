@@ -22,6 +22,7 @@ import type { UserProgress, ContentItem, Playlist, PlaylistType } from '@/types'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { mockPlaylists } from '@/lib/data/playlists'; // Import playlists from the data file
+import { cn } from '@/lib/utils'; // Import cn
 
 // Helper function to find video details across all playlists
 const findVideoDetails = (videoId: string): { video: ContentItem; playlistId: PlaylistType } | undefined => {
@@ -227,7 +228,7 @@ function VideoPageContent() {
                     Select a topic (HTML, CSS, or JavaScript) to start watching tutorials and tracking your progress.
                 </p>
                  {isGuest && (
-                    <Button asChild size="sm" variant="outline" className="mt-3">
+                    <Button asChild size="sm" variant="outline" className="mt-3 transition-transform duration-200 hover:scale-105 focus-visible:scale-105">
                         <Link href="/auth">Sign In / Register to Save Progress & Earn Rewards</Link>
                     </Button>
                 )}
@@ -240,7 +241,12 @@ function VideoPageContent() {
                         <TabsTrigger
                         key={playlist.id}
                         value={playlist.id}
-                        className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0 text-xs sm:text-sm py-2 sm:py-2.5"
+                        // Base styles are in ui/tabs, add specific layout/sizing here
+                         className={cn(
+                            "text-xs sm:text-sm py-2 sm:py-2.5",
+                            // Ensure focus ring is visible within the bordered list
+                            "focus-visible:ring-offset-0 focus-visible:z-10"
+                        )}
                         >
                         <playlist.icon className="h-4 w-4 mr-1.5 sm:mr-2" />
                         <span className="hidden sm:inline">{playlist.id.toUpperCase()}</span>
@@ -252,7 +258,7 @@ function VideoPageContent() {
 
                 {/* Tab Content */}
                 {Object.values(mockPlaylists).map((playlist) => (
-                <TabsContent key={playlist.id} value={playlist.id} className="mt-0 pt-0 animate-fadeIn">
+                <TabsContent key={playlist.id} value={playlist.id} className="mt-6"> {/* Keep mt-6 for spacing */}
                     <LearningContent
                     playlist={playlist}
                     userProgress={userProgress || {}} // Pass loaded progress (could be guest or user)

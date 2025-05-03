@@ -7,6 +7,7 @@ import { ExternalLink, Code, Palette, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils'; // Import cn
 
 // Define types for resources
 type ResourceCategory = 'html' | 'css' | 'javascript';
@@ -55,37 +56,67 @@ const resourceIcons = {
 // Resource Card Component
 const ResourceCard: React.FC<{ resource: Resource }> = ({ resource }) => {
   const typeColors = {
-    blog: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    documentation: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
-    tutorial: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
-    tool: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
+    blog: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-800/60',
+    documentation: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800/60',
+    tutorial: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-800/60',
+    tool: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800/60',
   };
+  const typeFocusRing = {
+      blog: 'focus-visible:ring-blue-500',
+      documentation: 'focus-visible:ring-green-500',
+      tutorial: 'focus-visible:ring-purple-500',
+      tool: 'focus-visible:ring-yellow-500',
+  }
 
   return (
-    <Card className="flex flex-col h-full overflow-hidden transition-shadow duration-300 hover:shadow-md">
-      <CardHeader className="pb-3 sm:pb-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-            <CardTitle className="text-base sm:text-lg font-semibold leading-tight flex-grow">{resource.title}</CardTitle>
-             <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap flex-shrink-0 mt-1 sm:mt-0 ${typeColors[resource.type]}`}>
-                 {resource.type.charAt(0).toUpperCase() + resource.type.slice(1)}
-            </span>
-        </div>
-        {resource.source && (
-           <p className="text-xs text-muted-foreground pt-1">Source: {resource.source}</p>
-        )}
-      </CardHeader>
-      <CardContent className="flex-grow pb-3 sm:pb-4">
-        <p className="text-sm text-muted-foreground">{resource.description}</p>
-      </CardContent>
-      <div className="p-4 pt-0 mt-auto"> {/* Ensure button is at the bottom */}
-        <Button variant="outline" size="sm" asChild className="w-full">
-          <Link href={resource.url} target="_blank" rel="noopener noreferrer">
-            Visit Resource
-            <ExternalLink className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
-    </Card>
+    // Wrap card in Link for accessibility and make whole card clickable
+    <Link
+      href={resource.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "group block rounded-lg overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        typeFocusRing[resource.type] // Apply focus ring based on type
+      )}
+    >
+        <Card className={cn(
+            "flex flex-col h-full", // Ensure card takes full height
+            "transition-all duration-300 group-hover:shadow-md group-hover:border-primary/40 group-focus-visible:shadow-md group-focus-visible:border-primary/40", // Add hover/focus effect on group
+            "border" // Keep base border
+        )}>
+            <CardHeader className="pb-3 sm:pb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                    <CardTitle className="text-base sm:text-lg font-semibold leading-tight flex-grow group-hover:text-primary transition-colors duration-200">{resource.title}</CardTitle>
+                    <span className={cn(
+                        `inline-block px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap flex-shrink-0 mt-1 sm:mt-0 border`, // Added border
+                        typeColors[resource.type]
+                    )}>
+                        {resource.type.charAt(0).toUpperCase() + resource.type.slice(1)}
+                    </span>
+                </div>
+                {resource.source && (
+                <p className="text-xs text-muted-foreground pt-1">Source: {resource.source}</p>
+                )}
+            </CardHeader>
+            <CardContent className="flex-grow pb-3 sm:pb-4">
+                <CardDescription className="text-sm">{resource.description}</CardDescription> {/* Use CardDescription */}
+            </CardContent>
+            <div className="p-4 pt-0 mt-auto"> {/* Ensure button is at the bottom */}
+                {/* Use a div styled like a button as it's inside a link */}
+                 <div
+                   className={cn(
+                      "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors",
+                      "h-9 px-3 w-full", // Button size sm
+                      "border border-input bg-background group-hover:bg-accent group-hover:text-accent-foreground group-focus-visible:bg-accent group-focus-visible:text-accent-foreground" // Style like outline button, react to group hover/focus
+                   )}
+                   aria-hidden="true"
+                 >
+                    Visit Resource
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                 </div>
+            </div>
+        </Card>
+    </Link>
   );
 };
 
@@ -123,7 +154,8 @@ export default function BlogsPage() {
                  <TabsTrigger
                      key={category}
                      value={category}
-                     className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0 text-xs sm:text-sm py-2 sm:py-2.5"
+                     // Classes moved to ui/tabs.tsx, only need base value here
+                     // className="transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md first:rounded-l-md last:rounded-r-md rounded-none data-[state=inactive]:border-r data-[state=inactive]:last:border-r-0 text-xs sm:text-sm py-2 sm:py-2.5"
                  >
                      <Icon className="h-4 w-4 mr-1.5 sm:mr-2" />
                      <span className="hidden sm:inline">{category.toUpperCase()}</span>

@@ -38,9 +38,12 @@ export default function BackToTopButton() {
       size="icon"
       onClick={scrollToTop}
       className={cn(
-        'fixed bottom-4 left-1/2 -translate-x-1/2 z-50 h-11 w-11 rounded-full shadow-lg transition-opacity duration-300', // Changed right-4 to left-1/2 -translate-x-1/2
+        'fixed bottom-4 left-1/2 -translate-x-1/2 z-50 h-11 w-11 rounded-full shadow-lg',
         'bg-background/80 backdrop-blur-sm hover:bg-accent', // Semi-transparent background
-        isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none' // Fade in/out
+        // Animation classes
+        'transition-all duration-300 ease-out', // Combined transition for opacity and transform
+        isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none', // Fade in/out with scale
+        'hover:scale-110 focus-visible:scale-110' // Hover/Focus scale animation
       )}
       aria-label="Scroll back to top"
     >

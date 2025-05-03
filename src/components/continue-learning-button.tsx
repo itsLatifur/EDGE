@@ -78,6 +78,7 @@ export default function ContinueLearningButton() {
   const { user, isGuest, loading: authLoading } = useAuth();
   const [userProgress, setUserProgress] = useState<{[videoId: string]: UserProgressEntry} | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+  const [isVisible, setIsVisible] = useState(false); // State to manage visibility for animation
 
   // Fetch progress based on auth state
   useEffect(() => {
@@ -117,9 +118,21 @@ export default function ContinueLearningButton() {
       return findNextVideo(userProgress);
   }, [userProgress, isLoadingProgress, authLoading]);
 
+   // Effect to control visibility for animation
+   useEffect(() => {
+     // Show button only after loading is complete and there's data
+     if (!isLoadingProgress && !authLoading && continueData) {
+       // Use a timeout to allow initial render before animation
+       const timer = setTimeout(() => setIsVisible(true), 100);
+       return () => clearTimeout(timer);
+     } else {
+       setIsVisible(false); // Hide if loading or no data
+     }
+   }, [isLoadingProgress, authLoading, continueData]);
 
-  if (!continueData || isLoadingProgress || authLoading) {
-    // Don't show if no video to continue or still loading
+
+  if (!continueData) {
+    // Don't render the button at all if no data (handles initial state and no progress cases)
     return null;
   }
 
@@ -132,8 +145,13 @@ export default function ContinueLearningButton() {
       variant="default" // Use primary color
       size="lg" // Make it larger
       className={cn(
-        'fixed bottom-4 right-4 z-50 h-12 shadow-lg transition-opacity duration-300',
-        'pl-4 pr-5' // Adjust padding for icon and text
+        'fixed bottom-4 right-4 z-50 h-12 shadow-lg',
+        'pl-4 pr-5', // Adjust padding for icon and text
+        // Animation classes
+        'transition-all duration-300 ease-out',
+        'transform scale-95 opacity-0', // Initial state for animation
+        isVisible && 'scale-100 opacity-100', // Visible state
+        'hover:scale-105 focus-visible:scale-105' // Hover/Focus scale animation
       )}
       aria-label={`Continue learning: ${continueData.video.title}`}
     >
