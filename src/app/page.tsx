@@ -107,14 +107,17 @@ export default function Home() {
     return (
       <div className="space-y-8 mt-8">
         {/* Skeleton for Tabs */}
-        <Skeleton className="h-10 w-1/3 rounded-md mb-6" />
-        {/* Skeleton for Video Player Area */}
-        <Skeleton className="aspect-video w-full mb-4" />
-        {/* Skeleton for Playlist Items */}
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-10 w-full md:w-1/3 rounded-md mb-6" />
+        <div className="flex flex-col md:flex-row gap-4">
+             {/* Skeleton for Video Player Area */}
+             <Skeleton className="aspect-video w-full md:w-2/3 mb-4" />
+             {/* Skeleton for Playlist Items */}
+             <div className="space-y-3 w-full md:w-1/3">
+               <Skeleton className="h-20 w-full" />
+               <Skeleton className="h-20 w-full" />
+               <Skeleton className="h-20 w-full" />
+               <Skeleton className="h-20 w-full" />
+             </div>
         </div>
       </div>
     );
@@ -122,10 +125,6 @@ export default function Home() {
 
   return (
     <div className="animate-fadeIn space-y-8 mt-8">
-      {/* Explanation for potential two video sections removed */}
-      {/* The "Continue Watching" card concept is integrated into the playlist now. */}
-      {/* The currently selected video (or the next suggested one) appears above the playlist. */}
-
       <Tabs defaultValue="html" className="w-full">
         {/* TabsList remains standard */}
         <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-muted">
@@ -177,23 +176,4 @@ export default function Home() {
       </Tabs>
     </div>
   );
-}
-
-// Ensure fade-in animation style is present (consider moving to globals.css if not already there)
-if (typeof window !== 'undefined') {
-  const styleId = 'fade-in-animation-style';
-  if (!document.getElementById(styleId)) {
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.innerHTML = `
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .animate-fadeIn {
-        animation: fadeIn 0.5s ease-out forwards;
-      }
-    `;
-    document.head.appendChild(style);
-  }
 }
