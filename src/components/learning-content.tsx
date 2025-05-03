@@ -135,7 +135,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
     // Use initialVideoId and initialStartTime as dependencies to react to URL changes
     // Also depend on playlist.id and userProgress
-  }, [playlist.id, userProgress, initialVideoId, initialStartTime]);
+  }, [playlist.id, playlist.videos, userProgress, initialVideoId, initialStartTime]); // Added playlist.videos dependency
 
 
   // Update iframe src only when activeVideo or its specific startTime changes
@@ -155,7 +155,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
           const newSrc = videoUrl.toString();
 
           // Check if src needs updating (different video or significantly different start time if same video)
-           const currentSrc = iframeRef.current.src;
+           const currentSrc = iframeRef.current.getAttribute('src'); // Use getAttribute
            let needsUpdate = false;
            if (!currentSrc) {
                needsUpdate = true; // No src set yet
@@ -180,13 +180,13 @@ const LearningContent: React.FC<LearningContentProps> = ({
           if (needsUpdate) {
               console.log(`Updating iframe src for ${activeVideo.id} to start at ${currentStartTime}s`);
               setIsVideoLoading(true); // Set loading state before changing src
-              iframeRef.current.src = newSrc;
+              iframeRef.current.src = newSrc; // Set src directly
           } else {
                // If src is the same and start time is close, assume it's playing, don't show loading
                if (isVideoLoading) setIsVideoLoading(false);
           }
       } else if (!activeVideo && iframeRef.current) {
-          iframeRef.current.src = ''; // Clear src if no active video
+          iframeRef.current.removeAttribute('src'); // Clear src if no active video
           setIsVideoLoading(false);
       } else if (!activeVideo) {
          setIsVideoLoading(false);
@@ -499,7 +499,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     ref={iframeRef}
                     width="100%"
                     height="100%"
-                    src="" // Initial src is empty, set by useEffect
+                    // src is set dynamically by useEffect, start without it
                     title={activeVideo.title}
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
