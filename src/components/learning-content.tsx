@@ -7,7 +7,7 @@ import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/compo
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Progress} from '@/components/ui/progress';
 import {Button} from '@/components/ui/button';
-import {PlayCircle, CheckCircle, Circle, ListVideo, Info, Clock, Loader2 } from 'lucide-react';
+import {PlayCircle, CheckCircle, Circle, ListVideo, Clock, Loader2 } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {
   Tooltip,
@@ -15,28 +15,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Skeleton } from './ui/skeleton';
+import type { ContentItem, UserProgress, Playlist } from '@/types'; // Import updated types
 
-interface ContentItem {
-  id: string;
-  title: string;
-  url: string;
-  duration: number; // Duration in seconds
-  description?: string; // Optional description
-}
-
-interface UserHistory {
-  [videoId: string]: {watchedTime: number; lastWatched: Date};
-}
 
 interface LearningContentProps {
-  title: string;
-  type: 'video' | 'article' | 'playlist';
-  url?: string; // Used for single video/article
-  playlist?: ContentItem[];
-  userHistory: UserHistory;
+  playlist: Playlist; // Use the Playlist interface
+  userProgress: UserProgress;
   onProgressUpdate: (videoId: string, currentTime: number) => void;
-  currentTab?: string; // To know which tab's playlist is active
+  currentTab?: string; // Keep for potential future use, but logic primarily uses playlist prop
 }
 
 // Helper function outside component
@@ -48,13 +34,10 @@ const formatTime = (seconds: number): string => {
 }
 
 const LearningContent: React.FC<LearningContentProps> = ({
-  title,
-  type,
-  url,
-  playlist = [],
-  userHistory,
+  playlist,
+  userProgress,
   onProgressUpdate,
-  currentTab,
+  currentTab, // Keep prop, but useEffect logic now relies on `playlist`
 }) => {
   const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null);
   const [activeVideoStartTime, setActiveVideoStartTime] = useState<number>(0);
@@ -64,51 +47,54 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const lastReportedTimeRef = useRef<number>(0); // Track last reported time to reduce updates
 
 
-  // Determine the initial/active video based on type and props
+  // Determine the initial/active video based on the provided playlist and userProgress
   useEffect(() => {
     setIsVideoLoading(true); // Assume loading when dependencies change
     let videoToPlay: ContentItem | null = null;
     let startTime = 0; // Declare startTime here with default value
 
-    if (type === 'playlist' && playlist.length > 0) {
+    if (playlist.videos.length > 0) {
       // Find the most recently watched video within *this* playlist
-      const playlistVideoIds = new Set(playlist.map(v => v.id));
-      const recentHistoryInPlaylist = Object.entries(userHistory)
-        .filter(([videoId, data]) => playlistVideoIds.has(videoId) && data?.lastWatched instanceof Date) // Ensure valid date
-        .sort(([, a], [, b]) => b.lastWatched.getTime() - a.lastWatched.getTime());
+      const playlistVideoIds = new Set(playlist.videos.map(v => v.id));
 
-      if (recentHistoryInPlaylist.length > 0) {
-          const [latestVideoId, latestData] = recentHistoryInPlaylist[0];
-          const videoDetails = playlist.find(v => v.id === latestVideoId);
-          // Only resume if not fully watched (e.g., less than 98% watched for buffer)
-          if (videoDetails && latestData.watchedTime < videoDetails.duration * 0.98) {
+      // Ensure userProgress is not null before accessing it
+      const relevantHistory = userProgress ? Object.entries(userProgress)
+          .filter(([videoId, data]) => playlistVideoIds.has(videoId) && data?.lastWatched instanceof Date && data.watchedTime > 0)
+          .sort(([, a], [, b]) => b.lastWatched.getTime() - a.lastWatched.getTime()) : [];
+
+
+      if (relevantHistory.length > 0) {
+          const [latestVideoId, latestData] = relevantHistory[0];
+          const videoDetails = playlist.videos.find(v => v.id === latestVideoId);
+          // Resume if not completed (using the 'completed' flag or time check)
+          if (videoDetails && !latestData.completed && latestData.watchedTime < videoDetails.duration * 0.98) {
               videoToPlay = videoDetails;
               startTime = latestData.watchedTime; // Update startTime
           }
       }
 
-      // If no resumable video found, find the first unwatched/partially watched in order
+      // If no resumable video found, find the first uncompleted in order
       if (!videoToPlay) {
-          const firstUnwatched = playlist.find(
-              (item) => !userHistory[item.id] || (item.duration > 0 && userHistory[item.id].watchedTime < item.duration * 0.98)
+          const firstUnwatched = playlist.videos.find(
+              (item) => !userProgress?.[item.id]?.completed // Check the completed flag
           );
-          videoToPlay = firstUnwatched || playlist[0]; // Fallback to the very first video
-          startTime = userHistory[videoToPlay.id]?.watchedTime || 0; // Update startTime
+          videoToPlay = firstUnwatched || playlist.videos[0]; // Fallback to the very first video
+          startTime = userProgress?.[videoToPlay.id]?.watchedTime || 0; // Update startTime
       }
 
       setActiveVideo(videoToPlay);
       setActiveVideoStartTime(startTime);
 
     } else {
-      // Reset or handle single video/article case
+      // Reset if playlist is empty
       setActiveVideo(null);
       setActiveVideoStartTime(0);
       setIsVideoLoading(false);
     }
     lastReportedTimeRef.current = startTime; // Reset last reported time when video changes
 
-    // Only depend on external props and type
-  }, [type, playlist, userHistory, url, currentTab]);
+    // Only depend on playlist and userProgress (which changes on login/update)
+  }, [playlist, userProgress]); // React to changes in the playlist itself or the user's progress
 
 
   // Update iframe src only when activeVideo or its specific startTime changes
@@ -116,9 +102,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
       if (activeVideo && iframeRef.current) {
           setIsVideoLoading(true); // Set loading state before changing src
           const videoUrl = new URL(activeVideo.url);
-          // Always enable JS API for potential future use (like getting real duration/progress)
+          // Enable JS API for YouTube Player API interaction (if needed later)
           videoUrl.searchParams.set('enablejsapi', '1');
-          // Add other useful params
           videoUrl.searchParams.set('autoplay', '1'); // Autoplay the selected video
           videoUrl.searchParams.set('modestbranding', '1'); // Reduce YouTube logo
           videoUrl.searchParams.set('rel', '0'); // Don't show related videos at the end
@@ -128,11 +113,12 @@ const LearningContent: React.FC<LearningContentProps> = ({
           }
 
           const newSrc = videoUrl.toString();
+          // Only update src if it's actually different to prevent unnecessary reloads
           if (iframeRef.current.src !== newSrc) {
               iframeRef.current.src = newSrc;
           } else {
-              // If src is the same, it might already be loaded or loading
-              // handleIframeLoad might be called again, or we assume it's fine
+              // If src is the same but start time changed, potentially seek?
+              // For simplicity now, we just set loading to false if src is same
                setIsVideoLoading(false);
           }
       } else if (!activeVideo && iframeRef.current) {
@@ -147,85 +133,109 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const handleIframeLoad = useCallback(() => {
     setIsVideoLoading(false);
     lastReportedTimeRef.current = activeVideoStartTime; // Ensure starting point is correct after load
-  }, [activeVideoStartTime]);
-
-
-  // Set up interval to track video progress (Simplified pseudo-progress)
-  useEffect(() => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-
-    // Only start interval if a video is active and not loading
-    if (activeVideo && !isVideoLoading && type !== 'article') {
-        let pseudoCurrentTime = activeVideoStartTime;
-
-        progressIntervalRef.current = setInterval(() => {
-            const currentIntervalVideo = activeVideo; // Use the video active when interval started
-            if (!currentIntervalVideo) {
-                if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-                return;
-            }
-
-            pseudoCurrentTime += 1;
-            const knownDuration = currentIntervalVideo.duration;
-
-             // Only report progress every 5 seconds or if the video is near completion/start
-            const shouldReport = pseudoCurrentTime - lastReportedTimeRef.current >= 5 ||
-                                pseudoCurrentTime <= 5 || // Report near start
-                                (knownDuration > 0 && knownDuration - pseudoCurrentTime <= 5); // Report near end
-
-            // Check if time is within known duration (if available)
-            if (knownDuration <= 0 || pseudoCurrentTime <= knownDuration) {
-                if (shouldReport) {
-                    onProgressUpdate(currentIntervalVideo.id, pseudoCurrentTime);
-                    lastReportedTimeRef.current = pseudoCurrentTime; // Update last reported time
-                }
-            } else {
-                // Time exceeded known duration, report final time and stop
-                if (lastReportedTimeRef.current < knownDuration) { // Report only if not already reported
-                     onProgressUpdate(currentIntervalVideo.id, knownDuration);
-                     lastReportedTimeRef.current = knownDuration;
-                 }
-                 if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-            }
-
-        }, 1000); // Check every second
-    }
-
-    return () => {
-      if (progressIntervalRef.current) {
+     // Clear any existing interval before starting a new one
+     if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
-    };
-    // Rerun effect if the active video changes, start time changes, or loading state changes
-  }, [activeVideo, activeVideoStartTime, isVideoLoading, onProgressUpdate, type]);
+      // Restart the progress interval tracking after iframe loads
+      startProgressTracking();
+
+  }, [activeVideoStartTime]); // Added missing dependency
+
+
+  // Function to start the progress tracking interval
+    const startProgressTracking = useCallback(() => {
+      if (progressIntervalRef.current) {
+         clearInterval(progressIntervalRef.current);
+      }
+
+      if (activeVideo && !isVideoLoading) {
+        let pseudoCurrentTime = activeVideoStartTime; // Initialize with start time
+
+        progressIntervalRef.current = setInterval(() => {
+          const currentIntervalVideo = activeVideo; // Capture activeVideo at interval creation
+          if (!currentIntervalVideo) {
+            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+            return;
+          }
+
+          pseudoCurrentTime += 1; // Increment time
+          const knownDuration = currentIntervalVideo.duration;
+
+          // Report progress every 5 seconds, near start, or near end
+          const shouldReport = pseudoCurrentTime - lastReportedTimeRef.current >= 5 ||
+                             pseudoCurrentTime <= 5 ||
+                             (knownDuration > 0 && knownDuration - pseudoCurrentTime <= 5);
+
+
+          if (knownDuration <= 0 || pseudoCurrentTime <= knownDuration) {
+             if (shouldReport) {
+               onProgressUpdate(currentIntervalVideo.id, pseudoCurrentTime);
+               lastReportedTimeRef.current = pseudoCurrentTime;
+             }
+          } else {
+            // Time exceeded known duration, report final time if not already done and stop
+            if (lastReportedTimeRef.current < knownDuration) {
+              onProgressUpdate(currentIntervalVideo.id, knownDuration);
+              lastReportedTimeRef.current = knownDuration;
+            }
+            if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+          }
+        }, 1000); // Check every second
+      }
+    }, [activeVideo, isVideoLoading, activeVideoStartTime, onProgressUpdate]); // Dependencies for the tracking logic
+
+
+    // Effect to manage the interval lifecycle
+    useEffect(() => {
+        // Start tracking when video is ready
+        if (activeVideo && !isVideoLoading) {
+            startProgressTracking();
+        }
+
+        // Cleanup function to clear interval when component unmounts or dependencies change
+        return () => {
+            if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            }
+        };
+    }, [activeVideo, isVideoLoading, startProgressTracking]); // Depend on video, loading state, and the tracking function itself
 
 
   const handlePlaylistItemClick = useCallback((item: ContentItem) => {
-    // Check if the clicked item is already active to avoid unnecessary state updates
+    // Only update if a different video is clicked
     if (activeVideo?.id !== item.id) {
-      const startTime = userHistory[item.id]?.watchedTime || 0;
+      const startTime = userProgress?.[item.id]?.watchedTime || 0;
       setActiveVideo(item);
       setActiveVideoStartTime(startTime);
       lastReportedTimeRef.current = startTime; // Reset reported time
       setIsVideoLoading(true); // Set loading state for the new video
+       // Clear interval immediately when switching videos
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
     }
-  }, [activeVideo, userHistory]); // Dependency on activeVideo and userHistory
+  }, [activeVideo?.id, userProgress]); // Simplified dependencies
 
 
-  // Memoize calculation for progress based on userHistory and item duration
+  // Memoize calculation for progress based on userProgress and item duration
   const getVideoProgress = useCallback((item: ContentItem): number => {
-      const history = userHistory[item.id];
+      const history = userProgress?.[item.id]; // Use optional chaining
       if (!history || !item.duration || item.duration <= 0) return 0;
-      // Ensure progress doesn't exceed 100%
       return Math.min(100, (history.watchedTime / item.duration) * 100);
-  }, [userHistory]);
+  }, [userProgress]);
 
-  // Memoize calculation for watched time based on userHistory
+  // Memoize calculation for watched time based on userProgress
   const getWatchedTime = useCallback((itemId: string): number => {
-      return userHistory[itemId]?.watchedTime || 0;
-  }, [userHistory]);
+      return userProgress?.[itemId]?.watchedTime || 0; // Use optional chaining
+  }, [userProgress]);
+
+   // Memoize completion status check
+   const isVideoCompleted = useCallback((item: ContentItem): boolean => {
+     const progressData = userProgress?.[item.id];
+     // Check the completed flag first, then fallback to time check
+     return progressData?.completed || (progressData?.watchedTime && item.duration > 0 && progressData.watchedTime >= item.duration * 0.95) || false;
+  }, [userProgress]);
 
   // Basic keyword extraction for thumbnail search hint (can be improved)
   const getThumbnailHint = useCallback((title: string) => {
@@ -243,28 +253,28 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
   // Memoize the playlist items rendering logic
    const renderedPlaylistItems = useMemo(() => {
-      return playlist.map((item, index) => {
+      return playlist.videos.map((item, index) => {
          const progress = getVideoProgress(item);
          const watchedTime = getWatchedTime(item.id);
-         const isCompleted = progress >= 98; // Mark as completed slightly before 100%
+         const isCompleted = isVideoCompleted(item); // Use memoized function
          const isActive = activeVideo?.id === item.id;
          const thumbnailHint = getThumbnailHint(item.title);
 
          let StatusIcon = Circle;
-         let iconColor = "text-muted-foreground/60"; // Default grey
+         let iconColor = "text-muted-foreground/60";
          let statusText = 'Not Started';
          if (isCompleted) {
              StatusIcon = CheckCircle;
-             iconColor = "text-green-600 dark:text-green-500"; // Consistent green
+             iconColor = "text-green-600 dark:text-green-500";
              statusText = 'Completed';
          } else if (isActive) {
              StatusIcon = PlayCircle;
-             iconColor = "text-primary animate-pulse"; // Use primary color with pulse
+             iconColor = "text-primary animate-pulse";
              statusText = 'Playing';
          } else if (watchedTime > 0) {
              StatusIcon = PlayCircle;
-             iconColor = "text-primary/80"; // Slightly faded primary for partial
-             statusText = 'Partially Watched';
+             iconColor = "text-primary/80";
+             statusText = 'In Progress'; // More accurate term
          }
 
          return (
@@ -274,34 +284,34 @@ const LearningContent: React.FC<LearningContentProps> = ({
                <Button
                  variant="ghost"
                  className={cn(
-                   "w-full justify-start h-auto p-3 text-left relative transition-colors duration-200 rounded-md", // Use rounded-md, add transition
-                   "flex items-start space-x-3 group hover:bg-muted/70", // Standard hover
-                    isActive ? 'bg-accent shadow-inner ring-1 ring-inset ring-primary/30' : '', // Active state with subtle ring
-                    {'opacity-80 hover:opacity-100': isCompleted && !isActive} // Slightly dim completed items, brighten on hover
+                   "w-full justify-start h-auto p-3 text-left relative transition-colors duration-200 rounded-md",
+                   "flex items-start space-x-3 group hover:bg-muted/70",
+                    isActive ? 'bg-accent shadow-inner ring-1 ring-inset ring-primary/30' : '',
+                    {'opacity-80 hover:opacity-100': isCompleted && !isActive}
                  )}
                  onClick={() => handlePlaylistItemClick(item)}
-                 aria-current={isActive ? 'page' : undefined} // Use 'page' for current item in a set
+                 aria-current={isActive ? 'page' : undefined}
                >
                    {/* Index Number */}
-                   <span className="text-xs font-medium text-muted-foreground w-5 text-center pt-1">{index + 1}</span>
+                   <span className="text-xs font-medium text-muted-foreground w-5 text-center pt-1 flex-shrink-0">{index + 1}</span>
 
                    {/* Thumbnail Area */}
                    <div className="w-24 flex-shrink-0 relative aspect-video rounded overflow-hidden shadow-sm">
                         <Image
-                           src={`https://picsum.photos/seed/${item.id}/96/54`} // Consistent seeded image
-                           alt="" // Decorative, title provides info
+                           src={`https://picsum.photos/seed/${item.id}/96/54`}
+                           alt="" // Decorative
                            layout="fill"
                            objectFit="cover"
                            className="transition-transform duration-300 group-hover:scale-105"
                            data-ai-hint={thumbnailHint}
-                           unoptimized // Good for external placeholders
+                           unoptimized
                         />
                          {/* Duration Badge */}
                         <div className="absolute bottom-1 right-1 bg-black/75 text-white text-[10px] px-1 py-0.5 rounded-sm font-medium">
                             {formatTime(item.duration)}
                         </div>
                          {/* Play Icon Overlay on Active/Hover */}
-                        {(isActive || progress > 0) && (
+                        {(isActive || watchedTime > 0) && ( // Show on hover if watched > 0
                             <div className={cn(
                                 "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity duration-200",
                                 isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -315,36 +325,36 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     <div className="flex-grow overflow-hidden pt-0">
                         <p className={cn(
                             'text-sm font-medium line-clamp-2',
-                             isActive ? 'text-primary font-semibold' : 'text-foreground' // Highlight active title
+                             isActive ? 'text-primary font-semibold' : 'text-foreground'
                          )}>
                             {item.title}
                         </p>
-                         {/* Description (optional, smaller) */}
-                         {/* {item.description && (
-                             <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{item.description}</p>
-                         )} */}
                          {/* Status Icon and Time/Progress */}
                         <div className="flex items-center text-xs text-muted-foreground mt-1 space-x-1.5">
                            <StatusIcon className={cn("h-3.5 w-3.5 flex-shrink-0", iconColor)} aria-hidden="true" />
                            <span className="truncate">
-                               {isCompleted ? 'Completed' : (watchedTime > 0 ? `${formatTime(watchedTime)} watched` : `Duration: ${formatTime(item.duration)}`)}
+                               {isCompleted ? 'Completed' : (watchedTime > 0 ? `${formatTime(watchedTime)} / ${formatTime(item.duration)}` : `Duration: ${formatTime(item.duration)}`)}
                            </span>
                         </div>
                     </div>
 
                     {/* Progress Bar (Subtle) */}
-                    {progress > 0 && (
+                    {progress > 0 && !isCompleted && ( // Hide if completed
                         <Progress
                          value={progress}
-                         className="absolute bottom-0 left-0 right-0 h-[3px] rounded-none opacity-70 group-hover:opacity-100" // Thinner, subtle, appears on hover
+                         className="absolute bottom-0 left-0 right-0 h-[3px] rounded-none opacity-70 group-hover:opacity-100"
                          indicatorClassName={cn(isCompleted ? 'bg-green-600 dark:bg-green-500' : 'bg-primary')}
                          aria-label={`${item.title} progress: ${Math.round(progress)}%`}
                          />
                     )}
+                     {/* Completed Indicator Bar */}
+                    {isCompleted && (
+                         <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-green-600 dark:bg-green-500 opacity-80" />
+                    )}
                </Button>
                </TooltipTrigger>
                 {/* Tooltip Content */}
-                <TooltipContent side="top" align="start" className="max-w-xs">
+                <TooltipContent side="left" align="start" className="max-w-xs" sideOffset={10}>
                   <p className="font-semibold">{item.title}</p>
                   {item.description && <p className="text-sm text-muted-foreground my-1">{item.description}</p>}
                   <div className="text-xs space-y-0.5 mt-1">
@@ -359,7 +369,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
            </TooltipProvider>
          );
        });
-   }, [playlist, activeVideo, userHistory, getVideoProgress, getWatchedTime, getThumbnailHint, handlePlaylistItemClick, handleIframeLoad]);
+   }, [playlist.videos, activeVideo?.id, getVideoProgress, getWatchedTime, isVideoCompleted, getThumbnailHint, handlePlaylistItemClick, handleIframeLoad]); // Added isVideoCompleted
 
 
   return (
@@ -369,13 +379,11 @@ const LearningContent: React.FC<LearningContentProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div className="mb-2 sm:mb-0">
                 <CardTitle className="text-lg font-semibold text-primary flex items-center gap-2">
-                    <ListVideo className="h-5 w-5" /> {title}
+                    <playlist.icon className="h-5 w-5" /> {playlist.title}
                 </CardTitle>
-                 {playlist.length > 0 && (
-                    <CardDescription className="text-sm mt-1">
-                        {playlist.length} videos ・ Select one to start learning.
-                    </CardDescription>
-                )}
+                <CardDescription className="text-sm mt-1">
+                    {playlist.videos.length} videos ・ {playlist.description}
+                </CardDescription>
             </div>
              {/* Optional: Maybe add overall progress for the playlist here */}
           </div>
@@ -386,7 +394,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
         <div className="flex flex-col md:flex-row">
 
           {/* Video Player Area */}
-          <div className="w-full md:flex-grow aspect-video bg-gradient-to-br from-muted/50 to-muted relative group"> {/* Use flex-grow */}
+          <div className="w-full md:flex-grow aspect-video bg-gradient-to-br from-muted/50 to-muted relative group">
             {/* Loading State Overlay */}
             {isVideoLoading && activeVideo && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10">
@@ -395,63 +403,51 @@ const LearningContent: React.FC<LearningContentProps> = ({
               </div>
             )}
             {/* Placeholder when no video is selected */}
-            {!activeVideo && type === 'playlist' && playlist.length > 0 && (
+            {!activeVideo && playlist.videos.length > 0 && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center p-4">
                   <ListVideo className="h-12 w-12 text-muted-foreground/50 mb-3" />
                   <p className="text-muted-foreground font-medium">Select a video from the playlist</p>
                   <p className="text-sm text-muted-foreground/80">Your learning journey awaits!</p>
               </div>
             )}
+            {/* Placeholder for empty playlist */}
+            {playlist.videos.length === 0 && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted text-center p-4">
+                   <ListVideo className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                   <p className="text-muted-foreground font-medium">No videos in this playlist yet.</p>
+                </div>
+            )}
+
 
              {/* YouTube Iframe */}
-             {(activeVideo || url) && (
+             {activeVideo && (
                  <iframe
                     ref={iframeRef}
                     width="100%"
                     height="100%"
-                    title={activeVideo?.title || title || 'Learning Video Player'}
+                    title={activeVideo.title}
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                     className={cn("block transition-opacity duration-300", isVideoLoading ? "opacity-0" : "opacity-100")}
-                    key={activeVideo?.id || 'single-video'} // Force re-render on video change
+                    key={activeVideo.id} // Force re-render on video change
                     onLoad={handleIframeLoad}
+                    // Removed src here, handled by useEffect
                   ></iframe>
               )}
           </div>
 
           {/* Playlist Area (Right on Desktop, Bottom on Mobile) */}
-          {type === 'playlist' && playlist.length > 0 && (
-            <div className="w-full md:w-80 lg:w-96 border-t md:border-t-0 md:border-l bg-background md:bg-muted/20 flex flex-col flex-shrink-0"> {/* Add flex-shrink-0 */}
-               <ScrollArea className="flex-grow h-[50vh] md:h-[calc(100%-0px)]"> {/* Fill height */}
+          {playlist.videos.length > 0 && (
+            <div className="w-full md:w-80 lg:w-96 border-t md:border-t-0 md:border-l bg-background md:bg-muted/20 flex flex-col flex-shrink-0">
+               <ScrollArea className="flex-grow h-[50vh] md:h-[calc(100vh-14rem)]"> {/* Adjusted height */}
                  <div className="p-2 space-y-1.5">
                      {renderedPlaylistItems}
                  </div>
                </ScrollArea>
-                {/* Maybe a small footer for the playlist section? */}
-               {/* <div className="p-2 border-t text-xs text-muted-foreground">
-                   Playlist Controls / Info
-               </div> */}
             </div>
           )}
         </div>
-
-        {/* Article Area (Placeholder) */}
-        {type === 'article' && url && (
-          <div className="p-6">
-             <CardHeader className="p-0 mb-4">
-                 <CardTitle className="text-lg flex items-center gap-2"><Info className="h-5 w-5"/> {title}</CardTitle>
-             </CardHeader>
-             <CardContent className="p-0">
-                 <p className="text-muted-foreground mb-4">Article content for "{title}" would be displayed here. Open the link to read more.</p>
-                 <Button asChild variant="outline" size="sm">
-                     <a href={url} target="_blank" rel="noopener noreferrer">
-                       Read Full Article
-                     </a>
-                 </Button>
-             </CardContent>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
