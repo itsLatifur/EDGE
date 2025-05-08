@@ -1,0 +1,91 @@
+
+[
+  {
+    "id": "PLDoPjvoNmCo_E_st7g3hGj9hBNP5m_4up",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PLDoPjvoNmCo_E_st7g3hGj9hBNP5m_4up",
+    "title": "HTML Full Course for Beginners",
+    "category": "html",
+    "description": "A comprehensive HTML course by freeCodeCamp.org, covering all essential tags and concepts for building websites.",
+    "creator": "freeCodeCamp.org"
+  },
+  {
+    "id": "PL4cUxeGkcC9gQeDH6xYhmOdu94Ry7xSoV",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4cUxeGkcC9gQeDH6xYhmOdu94Ry7xSoV",
+    "title": "HTML & CSS Crash Course",
+    "category": "html",
+    "description": "A faster-paced crash course on HTML & CSS basics by Traversy Media, perfect for getting started quickly.",
+    "creator": "Traversy Media"
+  },
+  {
+    "id": "PL4-IKwSrm2tvK0f5N7f9f3j0HxVW7sJ0j",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4-IKwSrm2tvK0f5N7f9f3j0HxVW7sJ0j",
+    "title": "Semantic HTML",
+    "category": "html",
+    "description": "Learn to use semantic HTML elements for better structure, accessibility, and SEO with Kevin Powell.",
+    "creator": "Kevin Powell"
+  },
+  {
+    "id": "PLDoPjvoNmCo7l1UE2m2t9x6PNTi0J0x-M",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PLDoPjvoNmCo7l1UE2m2t9x6PNTi0J0x-M",
+    "title": "CSS Full Course for Beginners",
+    "category": "css",
+    "description": "An in-depth CSS course from freeCodeCamp.org, covering selectors, properties, layout (Flexbox & Grid), and more.",
+    "creator": "freeCodeCamp.org"
+  },
+  {
+    "id": "PL4-IKwSrm2ttg_0z_po72gC7z4wB9Tj_A",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4-IKwSrm2ttg_0z_po72gC7z4wB9Tj_A",
+    "title": "Flexbox Simplified",
+    "category": "css",
+    "description": "Master CSS Flexbox layout with clear explanations and practical examples by Kevin Powell.",
+    "creator": "Kevin Powell"
+  },
+  {
+    "id": "PL4-IKwSrm2tu_8yYDAh_xP7k0L2k38_tI",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4-IKwSrm2tu_8yYDAh_xP7k0L2k38_tI",
+    "title": "CSS Grid Demystified",
+    "category": "css",
+    "description": "Learn the powerful CSS Grid layout system from scratch with Kevin Powell's detailed tutorials.",
+    "creator": "Kevin Powell"
+  },
+  {
+    "id": "PL4cUxeGkcC9h_sYJ3Jz4hPF5HASQnS3Yt",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4cUxeGkcC9h_sYJ3Jz4hPF5HASQnS3Yt",
+    "title": "CSS Animations & Transitions",
+    "category": "css",
+    "description": "Add smooth animations and transitions to your websites using modern CSS techniques with Traversy Media.",
+    "creator": "Traversy Media"
+  },
+  {
+    "id": "PLDoPjvoNmCo_b2v25SjHMrjQiA9H9LhW-",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PLDoPjvoNmCo_b2v25SjHMrjQiA9H9LhW-",
+    "title": "JavaScript Full Course for Beginners",
+    "category": "javascript",
+    "description": "A complete JavaScript course from freeCodeCamp.org, taking you from basic syntax to advanced topics.",
+    "creator": "freeCodeCamp.org"
+  },
+  {
+    "id": "PL4cUxeGkcC9gfoKa5la9dsdCNpuey2s-V",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4cUxeGkcC9gfoKa5la9dsdCNpuey2s-V",
+    "title": "JavaScript DOM Manipulation",
+    "category": "javascript",
+    "description": "Learn how to interact with HTML elements and create dynamic web pages using JavaScript DOM manipulation with Traversy Media.",
+    "creator": "Traversy Media"
+  },
+  {
+    "id": "PL4cUxeGkcC9jAhrjt2i1uS7e07pG9pxp4",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4cUxeGkcC9jAhrjt2i1uS7e07pG9pxp4",
+    "title": "Asynchronous JavaScript",
+    "category": "javascript",
+    "description": "Understand callbacks, promises, and async/await to handle asynchronous operations in JavaScript with The Net Ninja.",
+    "creator": "The Net Ninja"
+  },
+  {
+    "id": "PL0vfts4VzfNiI1BsIK5u7LpPaIDgS_3sC",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL0vfts4VzfNiI1BsIK5u7LpPaIDgS_3sC",
+    "title": "Modern JavaScript (ES6+)",
+    "category": "javascript",
+    "description": "A quick and concise overview of modern JavaScript syntax and features (ES6 and beyond) by Fireship.",
+    "creator": "Fireship"
+  }
+]

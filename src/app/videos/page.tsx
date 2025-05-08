@@ -2,30 +2,30 @@
 'use client';
 
 import React, {useState, useEffect, useCallback, Suspense, useMemo} from 'react';
-import { useSearchParams, useRouter } from 'next/navigation'; // Import useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/components/ui/card';
 import {Skeleton} from '@/components/ui/skeleton';
 import LearningContent from '@/components/learning-content';
-import PlaylistBrowser from '@/components/playlist-browser'; // Import PlaylistBrowser
+import PlaylistBrowser from '@/components/playlist-browser'; 
 import {useToast} from '@/hooks/use-toast';
-import { PlayCircle, Loader2, Award, Flame, Trophy, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { PlayCircle, Loader2, Award, Flame, Trophy, ArrowLeft, ListFilter } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import {
     getUserProgress,
     updateUserProgress,
     saveGuestProgress,
     loadGuestProgress,
-    updateGuestProgressEntry, // Add this import
+    updateGuestProgressEntry, 
 } from '@/services/user-progress';
-import type { UserProgress, ContentItem, Playlist, PlaylistType, BadgeId, PlaylistSummary } from '@/types'; // Import PlaylistSummary
+import type { UserProgress, Playlist, PlaylistType, BadgeId, PlaylistSummary } from '@/types';
 import { BADGE_IDS } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { playlistCategories, playlistVideos, findVideoDetails, findPlaylistSummary, getPlaylistIcon } from '@/lib/data/playlists'; // Import updated data structure and helpers
+// playlistCategories, playlistVideos, findVideoDetails, findPlaylistSummary, getPlaylistIcon are now driven by playlist-sources.json via playlists.ts
+import { playlistCategories, findVideoDetails, findPlaylistSummary, getPlaylistIcon, getPlaylistDetails } from '@/lib/data/playlists'; 
 import { cn } from '@/lib/utils';
 
-// Map badge IDs to display info (remains the same)
 const badgeDisplayInfo: Record<BadgeId, { name: string; icon: React.ElementType }> = {
     [BADGE_IDS.HTML_MASTER]: { name: 'HTML Master', icon: Award },
     [BADGE_IDS.CSS_STYLIST]: { name: 'CSS Stylist', icon: Award },
@@ -34,49 +34,49 @@ const badgeDisplayInfo: Record<BadgeId, { name: string; icon: React.ElementType 
     [BADGE_IDS.STREAK_7]: { name: '7 Day Streak', icon: Flame },
     [BADGE_IDS.STREAK_30]: { name: '30 Day Streak', icon: Flame },
     [BADGE_IDS.TRIFECTA]: { name: 'Trifecta', icon: Trophy },
+    // Dynamic playlist completion badges will be handled differently or might not need explicit display info here
+    // For now, we'll focus on the known ones.
 };
 
 
-// Component using useSearchParams needs to be wrapped in Suspense
 function VideoPageContent() {
     const { user, userProfile, isGuest, loading: authLoading, refreshUserProfile } = useAuth();
-    const [isLoading, setIsLoading] = useState(true); // Tracks progress loading specifically
+    const [isLoading, setIsLoading] = useState(true); 
     const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
     const { toast } = useToast();
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Read initial state from URL parameters
     const initialTab = (searchParams.get('tab') as PlaylistType | null) || 'html';
-    const initialPlaylistId = searchParams.get('playlistId');
-    const initialVideoId = searchParams.get('videoId');
+    // selectedPlaylistId is now YouTube Playlist ID
+    const initialPlaylistId = searchParams.get('playlistId'); 
+    // initialVideoId is now YouTube Video ID
+    const initialVideoId = searchParams.get('videoId'); 
     const initialTime = parseInt(searchParams.get('time') || '0', 10);
 
     const [activeTab, setActiveTab] = useState<PlaylistType>(initialTab);
-    const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(initialPlaylistId);
-    const [initialVideoInfo, setInitialVideoInfo] = useState<{ videoId: string | null; startTime: number }>({
+    const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(initialPlaylistId); // YouTube Playlist ID
+    const [initialVideoInfo, setInitialVideoInfo] = useState<{ videoId: string | null; startTime: number }>({ // videoId is YouTube Video ID
         videoId: initialVideoId,
         startTime: initialTime,
     });
 
 
-     // Effect to update state from URL parameters on change
     useEffect(() => {
         const currentTab = (searchParams.get('tab') as PlaylistType | null) || 'html';
-        const currentPlaylistId = searchParams.get('playlistId');
-        const currentVideoId = searchParams.get('videoId');
+        const currentPlaylistId = searchParams.get('playlistId'); // YouTube Playlist ID
+        const currentVideoId = searchParams.get('videoId'); // YouTube Video ID
         const currentTime = parseInt(searchParams.get('time') || '0', 10);
 
         setActiveTab(currentTab);
-        setSelectedPlaylistId(currentPlaylistId); // Update selected playlist based on URL
+        setSelectedPlaylistId(currentPlaylistId); 
         setInitialVideoInfo({ videoId: currentVideoId, startTime: currentTime });
     }, [searchParams]);
 
 
-    // Fetch user progress (Firestore or Local Storage) - Remains largely the same
     useEffect(() => {
         const fetchProgress = async () => {
-        setIsLoading(true); // Start loading progress data
+        setIsLoading(true); 
         let progressData: UserProgress | null = null;
         try {
             if (!isGuest && user) {
@@ -86,7 +86,7 @@ function VideoPageContent() {
             console.log("Loading guest progress from local storage");
             progressData = loadGuestProgress();
             }
-            setUserProgress(progressData || {}); // Use empty object if null/no progress found
+            setUserProgress(progressData || {}); 
         } catch (error) {
             console.error("Failed to fetch user progress:", error);
             toast({
@@ -94,31 +94,27 @@ function VideoPageContent() {
             description: "Could not load your learning progress.",
             variant: "destructive",
             });
-            setUserProgress({}); // Fallback to empty progress on error
+            setUserProgress({}); 
         } finally {
-            setIsLoading(false); // Finish loading progress data
+            setIsLoading(false); 
         }
         };
 
-        // Fetch progress only when auth state is resolved
         if (!authLoading) {
         fetchProgress();
         }
     }, [authLoading, isGuest, user?.uid, toast]);
 
-    // Memoize the selected playlist details
+    // Memoize the selected playlist details (uses YouTube Playlist ID)
     const selectedPlaylistDetails: Playlist | null = useMemo(() => {
         if (!selectedPlaylistId) return null;
-        const summary = findPlaylistSummary(selectedPlaylistId);
-        const videos = playlistVideos[selectedPlaylistId] || [];
-        if (!summary) return null;
-        return { ...summary, videos };
+        // getPlaylistDetails now fetches based on YouTube Playlist ID
+        return getPlaylistDetails(selectedPlaylistId); 
     }, [selectedPlaylistId]);
 
 
-    // Updated handleProgressUpdate - logic remains similar but uses updated findVideoDetails
-    const handleProgressUpdate = useCallback(async (videoId: string, currentTime: number) => {
-        const videoDetailsResult = findVideoDetails(videoId); // Uses the updated helper
+    const handleProgressUpdate = useCallback(async (videoId: string, currentTime: number) => { // videoId is YouTube Video ID
+        const videoDetailsResult = findVideoDetails(videoId); 
         if (!videoDetailsResult) return;
         const { video: videoDetails } = videoDetailsResult;
 
@@ -128,11 +124,11 @@ function VideoPageContent() {
         const isAlreadyCompleted = currentProgressState[videoId]?.completed || false;
 
         const isNowCompleted = !isAlreadyCompleted && cappedTime >= videoDetails.duration * 0.95;
-        const needsUpdate = (cappedTime > previousWatchedTime + 1) || (isNowCompleted && !isAlreadyCompleted);
+        const needsUpdate = (cappedTime > previousWatchedTime + 5) || (isNowCompleted && !isAlreadyCompleted); // Report every 5s or on completion
 
 
         if (needsUpdate) {
-            const updateTime = new Date(); // Consistent timestamp for this update
+            const updateTime = new Date(); 
             const updatedProgressEntry = {
                 watchedTime: cappedTime,
                 lastWatched: updateTime,
@@ -142,37 +138,31 @@ function VideoPageContent() {
 
             try {
                 if (!isGuest && user) {
-                     // updateUserProgress now handles points and badges internally
                     const { pointsAwarded, badgesAwarded } = await updateUserProgress(
                         user.uid,
-                        videoId,
+                        videoId, // YouTube Video ID
                         cappedTime,
                         updatedProgressEntry.completed,
                         updateTime
                     );
 
-                     // Show toasts for awarded points and badges
                     if (pointsAwarded > 0) {
                         toast({
                             title: "Progress Saved!",
                             description: `+${pointsAwarded} points earned!`,
                         });
                     }
-                    if (badgesAwarded.length > 0) {
-                        badgesAwarded.forEach(badgeId => {
-                            const badgeInfo = badgeDisplayInfo[badgeId];
-                            toast({
-                                title: "Achievement Unlocked!",
-                                description: `You earned the "${badgeInfo?.name || badgeId.replace(/-/g, ' ')}" badge!`,
-                            });
+                    badgesAwarded.forEach(badgeId => {
+                        const badgeInfo = badgeDisplayInfo[badgeId as keyof typeof badgeDisplayInfo] || { name: badgeId.replace(/-/g, ' '), icon: Award };
+                        toast({
+                            title: "Achievement Unlocked!",
+                            description: `You earned the "${badgeInfo.name}" badge!`,
                         });
+                    });
+                    if (badgesAwarded.length > 0 || pointsAwarded > 0) {
+                        await refreshUserProfile();
                     }
-
-                    // Refresh user profile in context to reflect new points/badges/streak
-                    await refreshUserProfile();
-
                 } else {
-                    // Guest user progress update
                     updateGuestProgressEntry(videoId, cappedTime, updatedProgressEntry.completed);
                     if (isNowCompleted) {
                         toast({
@@ -189,7 +179,6 @@ function VideoPageContent() {
                     description: "Could not save your progress.",
                     variant: "destructive",
                 });
-                // Rollback optimistic update for UI
                 setUserProgress(prev => {
                     const newState = { ...(prev || {}) };
                     if (previousWatchedTime === 0 && !isAlreadyCompleted) {
@@ -203,7 +192,6 @@ function VideoPageContent() {
                     }
                     return newState;
                 });
-                // Rollback guest storage if necessary
                 if (isGuest) {
                     const currentGuestProgress = loadGuestProgress() || {};
                     if (previousWatchedTime === 0 && !isAlreadyCompleted) {
@@ -211,7 +199,7 @@ function VideoPageContent() {
                     } else {
                         currentGuestProgress[videoId] = {
                             watchedTime: previousWatchedTime,
-                            lastWatched: currentProgressState[videoId]?.lastWatched || new Date(0), // Revert lastWatched too
+                            lastWatched: currentProgressState[videoId]?.lastWatched || new Date(0), 
                             completed: isAlreadyCompleted,
                         };
                     }
@@ -222,70 +210,57 @@ function VideoPageContent() {
     }, [user, userProgress, isGuest, toast, refreshUserProfile]);
 
 
-    // Handler for selecting a playlist from the browser
+    // Handler for selecting a playlist from the browser (playlistId is YouTube Playlist ID)
     const handleSelectPlaylist = (playlistId: string) => {
-        console.log("Selected playlist:", playlistId);
+        console.log("Selected playlist (YouTube Playlist ID):", playlistId);
         setSelectedPlaylistId(playlistId);
-        // Reset initial video info when selecting a new playlist
         setInitialVideoInfo({ videoId: null, startTime: 0 });
-        // Update URL, but remove videoId and time initially
         router.push(`/videos?tab=${activeTab}&playlistId=${playlistId}`, { scroll: false });
     };
 
-    // Handler to go back to playlist selection
+
     const handleBackToPlaylists = () => {
         setSelectedPlaylistId(null);
         setInitialVideoInfo({ videoId: null, startTime: 0 });
-        // Update URL to remove playlistId, videoId, and time
         router.push(`/videos?tab=${activeTab}`, { scroll: false });
     };
 
-    // Handler for tab change - clears selected playlist
+
      const handleTabChange = (value: string) => {
         const newTab = value as PlaylistType;
         setActiveTab(newTab);
-        setSelectedPlaylistId(null); // Deselect playlist when changing tabs
+        setSelectedPlaylistId(null); 
         setInitialVideoInfo({ videoId: null, startTime: 0 });
-        // Update URL to reflect new tab and remove playlist/video info
         router.push(`/videos?tab=${newTab}`, { scroll: false });
     };
 
-    // Display loading skeleton while auth or progress data is loading
+
     if (authLoading || isLoading) {
-        return <VideoPageSkeleton />; // Use the dedicated skeleton component
+        return <VideoPageSkeleton />; 
     }
 
-    // Render the main content
+
     return (
         <div className="animate-fadeIn space-y-6 sm:space-y-8 mt-6 sm:mt-8 lg:mt-10">
-            {/* Show back button only when a playlist is selected */}
-            {selectedPlaylistId && (
-                <Button variant="outline" size="sm" onClick={handleBackToPlaylists} className="mb-2">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Playlists
-                </Button>
-            )}
-
-            {!selectedPlaylistId && (
+            
+            {!selectedPlaylistId ? (
                  <>
-                     {/* Header for Playlist Browser */}
                     <div className="mb-6 sm:mb-8">
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2">
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-2">
+                            <ListFilter className="h-7 w-7 text-primary"/>
                             Learn with Interactive Playlists
                         </h1>
                         <p className="text-sm sm:text-base text-muted-foreground">
                             Select a topic (HTML, CSS, or JavaScript) and choose a playlist to start watching tutorials.
                         </p>
                         {isGuest && (
-                            <Button asChild size="sm" variant="outline" className="mt-3 transition-transform duration-200 hover:scale-105 focus-visible:scale-105">
+                            <Button asChild size="sm" variant="outline" className="mt-4 transition-transform duration-200 hover:scale-105 focus-visible:scale-105 shadow-sm border-primary/30 hover:bg-primary/10 text-primary hover:text-primary">
                                 <Link href="/auth">Sign In / Register to Save Progress & Earn Rewards</Link>
                             </Button>
                         )}
                     </div>
-                    {/* Tabs and Playlist Browser */}
                     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                         {/* Responsive Tabs List */}
-                        <TabsList className="grid w-full grid-cols-3 mb-6 shadow-sm bg-card border max-w-lg mx-auto">
+                        <TabsList className="grid w-full grid-cols-3 mb-6 shadow-md bg-card border-2 border-border max-w-xl mx-auto rounded-lg p-0.5">
                             {Object.keys(playlistCategories).map((key) => {
                                 const categoryId = key as PlaylistType;
                                 const Icon = getPlaylistIcon(categoryId);
@@ -294,11 +269,13 @@ function VideoPageContent() {
                                         key={categoryId}
                                         value={categoryId}
                                         className={cn(
-                                            "text-xs sm:text-sm py-2 sm:py-2.5",
-                                            "focus-visible:ring-offset-0 focus-visible:z-10"
+                                            "text-xs sm:text-sm py-2.5 sm:py-3 rounded-md", // Adjusted padding and ensure rounding for individual triggers
+                                            "focus-visible:ring-offset-0 focus-visible:z-10",
+                                            "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg",
+                                            "data-[state=inactive]:hover:bg-muted data-[state=inactive]:border-transparent border-2 border-transparent" // Ensure inactive also have border for consistent sizing
                                         )}
                                     >
-                                        <Icon className="h-4 w-4 mr-1.5 sm:mr-2" />
+                                        <Icon className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2" />
                                         <span className="hidden sm:inline">{categoryId.toUpperCase()}</span>
                                         <span className="sm:hidden">{categoryId.toUpperCase()}</span>
                                     </TabsTrigger>
@@ -306,7 +283,6 @@ function VideoPageContent() {
                             })}
                         </TabsList>
 
-                        {/* Tab Content for Playlist Browser */}
                         {Object.keys(playlistCategories).map((key) => {
                             const categoryId = key as PlaylistType;
                             return (
@@ -322,27 +298,32 @@ function VideoPageContent() {
                         })}
                     </Tabs>
                 </>
-            )}
-
-            {/* Display LearningContent when a playlist is selected */}
-            {selectedPlaylistId && selectedPlaylistDetails && (
-                <LearningContent
-                    playlist={selectedPlaylistDetails}
-                    userProgress={userProgress || {}}
-                    onProgressUpdate={handleProgressUpdate}
-                    initialVideoId={initialVideoInfo.videoId}
-                    initialStartTime={initialVideoInfo.startTime}
-                />
+            ) : (
+                 <>
+                    {selectedPlaylistId && (
+                        <Button variant="outline" size="sm" onClick={handleBackToPlaylists} className="mb-4 flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow hover:bg-accent">
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Playlists
+                        </Button>
+                    )}
+                    {selectedPlaylistDetails && (
+                        <LearningContent
+                            playlist={selectedPlaylistDetails} // Pass YouTube Playlist ID
+                            userProgress={userProgress || {}}
+                            onProgressUpdate={handleProgressUpdate}
+                            initialVideoId={initialVideoInfo.videoId} // Pass YouTube Video ID
+                            initialStartTime={initialVideoInfo.startTime}
+                        />
+                    )}
+                 </>
             )}
         </div>
     );
 }
 
-// Wrap the main content component with Suspense
+
 export default function VideosPage() {
     return (
-        // Key added to force re-render on search param change if necessary,
-        // but internal useEffect should handle it. Keep Suspense for safety.
         <Suspense fallback={<VideoPageSkeleton />}>
             <VideoPageContent />
         </Suspense>
@@ -350,58 +331,38 @@ export default function VideosPage() {
 }
 
 
-// Skeleton component to show while waiting for Suspense boundary or loading
-// Updated skeleton for playlist browser view
 function VideoPageSkeleton() {
      return (
       <div className="space-y-6 sm:space-y-8 mt-6 sm:mt-8 lg:mt-10 animate-pulse">
-         {/* Intro Skeleton */}
         <div className="space-y-2 mb-6 sm:mb-8">
-            <Skeleton className="h-8 w-3/5 rounded-md" />
+            <Skeleton className="h-8 w-3/5 rounded-lg" />
             <Skeleton className="h-4 w-4/5 rounded-md" />
-            <Skeleton className="h-8 w-48 rounded-md mt-3" /> {/* Skeleton for Sign In button */}
+            <Skeleton className="h-9 w-52 rounded-md mt-4" /> 
         </div>
-        {/* Tabs Skeleton */}
-        <Skeleton className="h-10 w-full max-w-lg mx-auto rounded-md mb-6" />
+        <Skeleton className="h-12 w-full max-w-xl mx-auto rounded-lg mb-6" />
 
-        {/* Playlist Browser Skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[...Array(6)].map((_, i) => (
-                <Card key={i}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <Skeleton className="h-5 w-1/3 rounded" />
-                        <Skeleton className="h-6 w-6 rounded-full" />
+            {[...Array(3)].map((_, i) => (
+                <Card key={i} className="rounded-xl">
+                    <CardHeader className="pb-3">
+                        <div className="flex justify-between items-start gap-2 mb-1">
+                            <Skeleton className="h-6 w-3/5 rounded-md" />
+                            <Skeleton className="h-6 w-6 rounded-full" />
+                        </div>
+                        <Skeleton className="h-3 w-1/3 rounded-md mb-1" />
+                        <Skeleton className="h-3 w-1/4 rounded-md" />
                     </CardHeader>
-                    <CardContent>
-                        <Skeleton className="h-4 w-4/5 rounded mb-2" />
-                        <Skeleton className="h-3 w-1/2 rounded mb-3" />
-                        <Skeleton className="h-8 w-full rounded" />
+                    <CardContent className="pb-3">
+                        <Skeleton className="h-10 w-full rounded-md mb-3" />
+                         <Skeleton className="h-2 w-full rounded-full mb-1.5" />
+                         <Skeleton className="h-3 w-1/2 rounded-md" />
                     </CardContent>
+                     <div className="p-4 pt-0">
+                         <Skeleton className="h-9 w-full rounded-md" />
+                     </div>
                 </Card>
             ))}
         </div>
-
-         {/* OR Video Player Skeleton (could conditionally show one or the other) */}
-        {/*
-        <Card className="overflow-hidden">
-          <CardHeader className="p-4">
-              <Skeleton className="h-6 w-1/3 rounded" />
-              <Skeleton className="h-4 w-1/2 rounded mt-1" />
-          </CardHeader>
-          <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row">
-                  <div className="w-full md:flex-grow aspect-video bg-muted flex items-center justify-center">
-                     <PlayCircle className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/30" />
-                  </div>
-                  <div className="w-full md:w-80 lg:w-96 p-2 sm:p-4 space-y-2 sm:space-y-3 border-t md:border-t-0 md:border-l h-[50vh] md:h-auto overflow-y-auto">
-                      <Skeleton className="h-16 w-full rounded" />
-                      <Skeleton className="h-16 w-full rounded" />
-                      <Skeleton className="h-16 w-full rounded" />
-                  </div>
-              </div>
-          </CardContent>
-        </Card>
-        */}
       </div>
     );
 }
