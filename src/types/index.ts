@@ -99,4 +99,3 @@ export const BADGE_IDS = {
 export type KnownBadgeId = typeof BADGE_IDS[keyof typeof BADGE_IDS];
 export type DynamicBadgeId = `${typeof BADGE_IDS.PLAYLIST_COMPLETE_PREFIX}${string}`;
 export type BadgeId = KnownBadgeId | DynamicBadgeId;
-```

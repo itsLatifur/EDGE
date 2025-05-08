@@ -520,4 +520,3 @@ export const createUserProfileDocument = async (uid: string, email: string | nul
         throw error; // Re-throw error
     }
 };
-```
