@@ -14,16 +14,15 @@ export function ThemeToggle() {
 
   if (!mounted) {
     // Render a placeholder or null to avoid hydration mismatch
-    return <Button variant="ghost" size="icon" className="w-9 h-9" disabled><Sun className="h-[1.2rem] w-[1.2rem]" /></Button>;
+    return <Button variant="ghost" size="icon" disabled><Sun className="h-[1.2rem] w-[1.2rem]" /></Button>;
   }
 
   return (
     <Button
       variant="ghost"
-      size="icon"
+      size="icon" // size="icon" makes it h-10 w-10 by default
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
       aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      className="w-9 h-9"
     >
       {resolvedTheme === "dark" ? (
         <Sun className="h-[1.2rem] w-[1.2rem] transition-all" />
@@ -33,3 +32,4 @@ export function ThemeToggle() {
     </Button>
   );
 }
+
