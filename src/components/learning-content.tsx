@@ -476,55 +476,60 @@ const LearningContent: React.FC<LearningContentProps> = ({
           </div>
       </CardHeader>
 
-      <CardContent className="p-0">
-        <div ref={containerRef} className="flex flex-col md:flex-row">
+      <CardContent className="p-0"> {/* p-0 to allow flex children to manage their own padding */}
+        <div ref={containerRef} className="flex flex-col md:flex-row"> {/* Main flex container for video and playlist */}
+          {/* Video Player Section */}
           <div className={cn(
-            "w-full relative bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner",
-             isMobileScreen ? "aspect-video" : "md:flex-1" // flex-1 allows it to grow
-             // Add min-width for video player on desktop to prevent it from becoming too small
-            // This is implicitly handled by playlist max width, but can be explicit:
-            // !isMobileScreen && "md:min-w-[40%]"
+            "relative bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner",
+            isMobileScreen ? "w-full" : "md:flex-1 md:min-w-0", // flex-1 allows it to grow, min-w-0 for proper shrinking
           )}>
-            {isVideoLoading && activeVideo && (
-               <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-md z-10 text-center p-4 animate-pulseFast">
-                   <Loader2 className="h-10 w-10 sm:h-14 sm:w-14 text-primary animate-spin mb-3 sm:mb-4" />
-                   <p className="text-muted-foreground text-sm sm:text-base font-medium">Loading: {activeVideo.title}...</p>
-                   <p className="text-xs text-muted-foreground/80 mt-1">Please wait a moment.</p>
-              </div>
-            )}
-            {!activeVideo && (playlist?.videos?.length || 0) > 0 && (
-               <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 text-center p-4">
-                  <ListVideo className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/40 mb-3 sm:mb-4" />
-                  <p className="text-muted-foreground text-base sm:text-lg font-semibold">Select a video to start learning</p>
-                  <p className="text-sm text-muted-foreground/80 mt-1.5">Your journey to mastering {playlist.category} begins here!</p>
-              </div>
-            )}
-            {(!playlist?.videos || playlist.videos.length === 0) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 text-center p-4">
-                   <ListVideo className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/40 mb-3 sm:mb-4" />
-                   <p className="text-muted-foreground text-base sm:text-lg font-semibold">No videos in this playlist yet.</p>
-                   <p className="text-sm text-muted-foreground/80 mt-1.5">Check back soon for new content!</p>
+             {/* Aspect Ratio Enforcer and Content Holder for Video */}
+            <div className={cn(
+              "w-full aspect-[16/9] relative", // Enforces 16:9, takes full width of its parent
+              !isMobileScreen && "max-h-[calc(100vh-12rem)]" // Max height on desktop (adjust 12rem as needed for headers/footers/padding)
+            )}>
+              {isVideoLoading && activeVideo && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-md z-10 text-center p-4 animate-pulseFast">
+                     <Loader2 className="h-10 w-10 sm:h-14 sm:w-14 text-primary animate-spin mb-3 sm:mb-4" />
+                     <p className="text-muted-foreground text-sm sm:text-base font-medium">Loading: {activeVideo.title}...</p>
+                     <p className="text-xs text-muted-foreground/80 mt-1">Please wait a moment.</p>
                 </div>
-            )}
-
-             {activeVideo && (
-                 <iframe
-                    ref={iframeRef}
-                    title={activeVideo.title}
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                    className={cn(
-                      "block absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out",
-                      isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100"
-                     )}
-                    key={`${activeVideo.id}-${activeVideoStartTime}`}
-                    onLoad={handleIframeLoad}
-                    src={iframeRef.current?.src || "about:blank"}
-                  ></iframe>
               )}
+              {!activeVideo && (playlist?.videos?.length || 0) > 0 && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 text-center p-4">
+                    <ListVideo className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/40 mb-3 sm:mb-4" />
+                    <p className="text-muted-foreground text-base sm:text-lg font-semibold">Select a video to start learning</p>
+                    <p className="text-sm text-muted-foreground/80 mt-1.5">Your journey to mastering {playlist.category} begins here!</p>
+                </div>
+              )}
+              {(!playlist?.videos || playlist.videos.length === 0) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/80 text-center p-4">
+                     <ListVideo className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground/40 mb-3 sm:mb-4" />
+                     <p className="text-muted-foreground text-base sm:text-lg font-semibold">No videos in this playlist yet.</p>
+                     <p className="text-sm text-muted-foreground/80 mt-1.5">Check back soon for new content!</p>
+                  </div>
+              )}
+
+               {activeVideo && (
+                   <iframe
+                      ref={iframeRef}
+                      title={activeVideo.title}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      className={cn(
+                        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out", // Fills the aspect ratio container
+                        isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100"
+                       )}
+                      key={`${activeVideo.id}-${activeVideoStartTime}`}
+                      onLoad={handleIframeLoad}
+                      src={iframeRef.current?.src || "about:blank"} // Use current src to avoid re-render if only loading state changes
+                    ></iframe>
+                )}
+            </div>
           </div>
 
+          {/* Resizer (Desktop Only) */}
           {!isMobileScreen && (playlist?.videos?.length || 0) > 0 && (
             <div
                 className={cn(
@@ -538,19 +543,16 @@ const LearningContent: React.FC<LearningContentProps> = ({
             </div>
           )}
 
-
+          {/* Playlist Section */}
           {(playlist?.videos?.length || 0) > 0 && (
             <div
                 className={cn(
                     "w-full md:flex-shrink-0 border-t md:border-t-0 md:border-l bg-background/70 md:bg-muted/20 flex flex-col backdrop-blur-sm",
-                    isMobileScreen ? "h-[50vh] sm:h-[55vh]" : "" // Fixed height for mobile, dynamic for desktop playlist
+                    isMobileScreen ? "h-[50vh] sm:h-[55vh]" : "", // On desktop, height is determined by flex row (align-items: stretch by default)
                 )}
                 style={!isMobileScreen ? { width: `${playlistWidth}px` } : {}}
             >
-               <ScrollArea
-                className="flex-grow md:h-[calc(var(--vh,1vh)*100-theme(spacing.16)-theme(spacing.16)-2px)] md:max-h-[calc(100vh-theme(spacing.16)-theme(spacing.4)-2px)]" // Adjusted for border
-                style={{ '--vh': '1vh' } as React.CSSProperties}
-               >
+               <ScrollArea className="flex-1"> {/* Use flex-1 to grow within the flex-col parent */}
                  <div className="p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
                      {renderedPlaylistItems}
                  </div>
