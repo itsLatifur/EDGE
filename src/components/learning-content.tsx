@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
@@ -7,7 +6,7 @@ import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/compo
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Progress} from '@/components/ui/progress';
 import {Button} from '@/components/ui/button';
-import {PlayCircle, CheckCircle, Circle, ListVideo, Clock, Loader2, TvMinimalPlay } from 'lucide-react';
+import {PlayCircle, CheckCircle, Circle, ListVideo, Clock, Loader2, TvMinimalPlay, GripVertical } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {
   Tooltip,
@@ -15,18 +14,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { ContentItem, UserProgress, Playlist, UserProgressEntry } from '@/types'; // Import updated types
-import { getPlaylistIcon } from '@/lib/data/playlists'; // Import helper
+import type { ContentItem, UserProgress, Playlist } from '@/types';
+import { getPlaylistIcon } from '@/lib/data/playlists';
 
 interface LearningContentProps {
-  playlist: Playlist; // Now accepts the full Playlist object (id is YouTube Playlist ID)
-  userProgress: UserProgress; // Can be an empty object {} but not null
-  onProgressUpdate: (videoId: string, currentTime: number) => void; // videoId is YouTube Video ID
-  initialVideoId?: string | null; // Optional initial YouTube Video ID from URL
-  initialStartTime?: number; // Optional initial start time from URL
+  playlist: Playlist;
+  userProgress: UserProgress;
+  onProgressUpdate: (videoId: string, currentTime: number) => void;
+  initialVideoId?: string | null;
+  initialStartTime?: number;
 }
 
-// Helper function outside component
 const formatTime = (seconds: number): string => {
   if (isNaN(seconds) || seconds < 0) return "0:00";
   const minutes = Math.floor(seconds / 60);
@@ -34,20 +32,52 @@ const formatTime = (seconds: number): string => {
   return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
 }
 
+const MIN_PLAYLIST_WIDTH = 280; // Approx 18rem
+const MAX_PLAYLIST_WIDTH_PERCENTAGE = 0.6; // Max 60% of container width
+
 const LearningContent: React.FC<LearningContentProps> = ({
-  playlist, 
+  playlist,
   userProgress,
   onProgressUpdate,
   initialVideoId,
   initialStartTime = 0,
 }) => {
-  const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null); // ContentItem.id is YouTube Video ID
+  const [activeVideo, setActiveVideo] = useState<ContentItem | null>(null);
   const [activeVideoStartTime, setActiveVideoStartTime] = useState<number>(0);
-  const [isVideoLoading, setIsVideoLoading] = useState(true); 
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastReportedTimeRef = useRef<number>(0); 
-  const playlistItemRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map()); 
+  const lastReportedTimeRef = useRef<number>(0);
+  const playlistItemRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
+  const [playlistWidth, setPlaylistWidth] = useState<number>(384); // Default width (24rem)
+  const [isResizing, setIsResizing] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [initialPlaylistWidth, setInitialPlaylistWidth] = useState(0);
+
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsMobileScreen(window.innerWidth < 768); // md breakpoint
+    };
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+
+    const savedWidth = localStorage.getItem('playlistWidth');
+    if (savedWidth) {
+      setPlaylistWidth(parseInt(savedWidth, 10));
+    }
+
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileScreen) {
+        localStorage.setItem('playlistWidth', playlistWidth.toString());
+    }
+  }, [playlistWidth, isMobileScreen]);
 
 
   useEffect(() => {
@@ -66,17 +96,15 @@ const LearningContent: React.FC<LearningContentProps> = ({
    useEffect(() => {
     setIsVideoLoading(true);
     let videoToPlay: ContentItem | null = null;
-    let determinedStartTime = 0; 
+    let determinedStartTime = 0;
 
     if (playlist.videos.length > 0) {
         if (initialVideoId) {
             const foundVideo = playlist.videos.find(v => v.id === initialVideoId);
             if (foundVideo) {
-                console.log(`Setting initial video from URL: ${initialVideoId} at ${initialStartTime}s`);
                 videoToPlay = foundVideo;
                 determinedStartTime = initialStartTime > 0 ? initialStartTime : (userProgress[initialVideoId]?.watchedTime || 0);
             } else {
-                console.warn(`Video ID ${initialVideoId} from URL not found in playlist ${playlist.id}.`);
                 const firstUnwatched = playlist.videos.find(
                     (item) => !userProgress[item.id]?.completed
                 );
@@ -88,11 +116,9 @@ const LearningContent: React.FC<LearningContentProps> = ({
                 (item) => !userProgress[item.id]?.completed
             );
             if (firstUnwatched) {
-                console.log(`Starting first unwatched video: ${firstUnwatched.id}`);
                 videoToPlay = firstUnwatched;
                 determinedStartTime = userProgress[firstUnwatched.id]?.watchedTime || 0;
             } else {
-                 console.log(`Falling back to first video: ${playlist.videos[0].id}`);
                 videoToPlay = playlist.videos[0];
                 determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
             }
@@ -104,9 +130,9 @@ const LearningContent: React.FC<LearningContentProps> = ({
         setActiveVideoStartTime(0);
         setIsVideoLoading(false);
     }
-    lastReportedTimeRef.current = determinedStartTime; 
+    lastReportedTimeRef.current = determinedStartTime;
 
-  }, [playlist.id, playlist.videos, userProgress, initialVideoId, initialStartTime]); 
+  }, [playlist.id, playlist.videos, userProgress, initialVideoId, initialStartTime]);
 
 
   useEffect(() => {
@@ -139,24 +165,22 @@ const LearningContent: React.FC<LearningContentProps> = ({
                    }
                } catch (e) {
                    needsUpdate = true;
-                   console.error("Could not parse current iframe src:", currentSrc, e);
                }
            }
 
           if (needsUpdate) {
-              console.log(`Updating iframe src for ${activeVideo.id} to start at ${currentStartTime}s`);
               setIsVideoLoading(true);
               iframeRef.current.src = newSrc;
           } else {
                if (isVideoLoading) setIsVideoLoading(false);
           }
       } else if (!activeVideo && iframeRef.current) {
-          iframeRef.current.src = 'about:blank'; 
+          iframeRef.current.src = 'about:blank';
           setIsVideoLoading(false);
       } else if (!activeVideo) {
          setIsVideoLoading(false);
       }
-  }, [activeVideo, activeVideoStartTime, isVideoLoading]); 
+  }, [activeVideo, activeVideoStartTime, isVideoLoading]);
 
 
  const startProgressTracking = useCallback(() => {
@@ -169,7 +193,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
         lastReportedTimeRef.current = activeVideoStartTime;
 
         progressIntervalRef.current = setInterval(() => {
-            const intervalVideoId = activeVideo?.id; // YouTube Video ID
+            const intervalVideoId = activeVideo?.id;
             const intervalVideoDuration = activeVideo?.duration;
 
             if (!intervalVideoId || !intervalVideoDuration) {
@@ -201,9 +225,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
 
   const handleIframeLoad = useCallback(() => {
-    console.log(`Iframe loaded for ${activeVideo?.id}`);
     setIsVideoLoading(false);
-  }, [activeVideo?.id]);
+  }, []);
 
 
   useEffect(() => {
@@ -213,44 +236,39 @@ const LearningContent: React.FC<LearningContentProps> = ({
       return () => {
           if (progressIntervalRef.current) {
               clearInterval(progressIntervalRef.current);
-              progressIntervalRef.current = null; 
+              progressIntervalRef.current = null;
           }
       };
   }, [activeVideo, isVideoLoading, startProgressTracking]);
 
 
-  const handlePlaylistItemClick = useCallback((item: ContentItem) => { // item.id is YouTube Video ID
+  const handlePlaylistItemClick = useCallback((item: ContentItem) => {
     if (activeVideo?.id !== item.id) {
       const startTime = userProgress[item.id]?.watchedTime || 0;
-      console.log(`Playlist item clicked: ${item.id}, setting start time to ${startTime}s`);
       setActiveVideo(item);
       setActiveVideoStartTime(startTime);
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null; 
+        progressIntervalRef.current = null;
       }
-      // TODO: Update URL here via router or lifted state, using playlist.id (YouTube Playlist ID) and item.id (YouTube Video ID)
-      // e.g., router.push(`/videos?tab=${playlist.category}&playlistId=${playlist.id}&videoId=${item.id}&time=${Math.floor(startTime)}`, { scroll: false });
-    } else {
-         console.log(`Playlist item clicked: ${item.id} (already active)`);
     }
-  }, [activeVideo?.id, userProgress, playlist.id, playlist.category]); 
+  }, [activeVideo?.id, userProgress]);
 
 
   const getVideoProgress = useCallback((item: ContentItem): number => {
-      const history = userProgress[item.id]; // item.id is YouTube Video ID
+      const history = userProgress[item.id];
       if (!history || !item.duration || item.duration <= 0) return 0;
       return Math.min(100, (history.watchedTime / item.duration) * 100);
   }, [userProgress]);
 
 
-  const getWatchedTime = useCallback((itemId: string): number => { // itemId is YouTube Video ID
+  const getWatchedTime = useCallback((itemId: string): number => {
       return userProgress[itemId]?.watchedTime || 0;
   }, [userProgress]);
 
 
    const isVideoCompleted = useCallback((item: ContentItem): boolean => {
-     const progressData = userProgress[item.id]; // item.id is YouTube Video ID
+     const progressData = userProgress[item.id];
      return progressData?.completed || (progressData?.watchedTime && item.duration > 0 && progressData.watchedTime >= item.duration * 0.95) || false;
   }, [userProgress]);
 
@@ -265,13 +283,13 @@ const LearningContent: React.FC<LearningContentProps> = ({
       if (lowerTitle.includes('media') || lowerTitle.includes('image') || lowerTitle.includes('video')) return 'html media image video embed';
       if (lowerTitle.includes('animation') || lowerTitle.includes('transition')) return 'css animation motion transition';
       if (lowerTitle.includes('array') || lowerTitle.includes('object')) return 'javascript data structure array object manipulation';
-      return 'web development tutorial coding learn programming'; 
+      return 'web development tutorial coding learn programming';
   }, []);
 
 
    const renderedPlaylistItems = useMemo(() => {
       if (!playlist?.videos) return [];
-      return playlist.videos.map((item, index) => { // item.id is YouTube Video ID
+      return playlist.videos.map((item, index) => {
          const progress = getVideoProgress(item);
          const watchedTime = getWatchedTime(item.id);
          const isCompleted = isVideoCompleted(item);
@@ -286,8 +304,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
              iconColor = "text-green-600 dark:text-green-500";
              statusText = 'Completed';
          } else if (isActive) {
-             StatusIcon = TvMinimalPlay; // Updated Icon
-             iconColor = "text-primary animate-pulseFast"; // Faster pulse
+             StatusIcon = TvMinimalPlay;
+             iconColor = "text-primary animate-pulseFast";
              statusText = 'Playing';
          } else if (watchedTime > 0) {
              StatusIcon = PlayCircle;
@@ -303,9 +321,9 @@ const LearningContent: React.FC<LearningContentProps> = ({
                  ref={(el) => playlistItemRefs.current.set(item.id, el)}
                  variant="ghost"
                  className={cn(
-                   "w-full justify-start h-auto p-2 sm:p-3 text-left relative transition-all duration-200 ease-in-out rounded-lg group border-2 border-transparent", 
-                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:z-10", 
-                   "hover:bg-muted/80 hover:border-primary/30", 
+                   "w-full justify-start h-auto p-2 sm:p-3 text-left relative transition-all duration-200 ease-in-out rounded-lg group border-2 border-transparent",
+                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:z-10",
+                   "hover:bg-muted/80 hover:border-primary/30",
                     isActive ? 'bg-primary/10 shadow-inner ring-2 ring-inset ring-primary/70 border-primary/70' : (isCompleted ? 'bg-green-500/10 border-green-500/30 hover:border-green-500/50' :'hover:border-border'),
                     {'opacity-70 hover:opacity-100': isCompleted && !isActive}
                  )}
@@ -316,20 +334,20 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
                    <div className="w-24 sm:w-28 flex-shrink-0 relative aspect-video rounded-md overflow-hidden shadow-md border border-border/60 group-hover:shadow-lg transition-shadow duration-200">
                         <Image
-                           src={`https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`} // Standard YouTube thumbnail URL structure
+                           src={`https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`}
                            alt={`Thumbnail for ${item.title}`}
                            layout="fill"
                            objectFit="cover"
                            className="transition-transform duration-300 group-hover:scale-105"
-                           data-ai-hint={thumbnailHint} // Keep for potential future use
-                           unoptimized // Generally good for external URLs
+                           data-ai-hint={thumbnailHint}
+                           unoptimized
                         />
                         <div className="absolute bottom-0.5 right-0.5 sm:bottom-1 sm:right-1 bg-black/85 text-white text-[10px] px-1.5 py-0.5 rounded-sm font-semibold backdrop-blur-sm">
                             {formatTime(item.duration)}
                         </div>
                         <div className={cn(
                              "absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-center justify-center transition-opacity duration-300",
-                             isActive ? "opacity-0" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" 
+                             isActive ? "opacity-0" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
                          )}>
                            <PlayCircle className="h-7 w-7 sm:h-8 sm:w-8 text-white/90 drop-shadow-xl" />
                         </div>
@@ -365,7 +383,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
                             isCompleted ? 'bg-green-600/30 dark:bg-green-500/30' : (isActive ? 'bg-primary/30' : 'bg-muted')
                          )}
                          indicatorClassName={cn(
-                            'transition-all duration-500 ease-out rounded-full', 
+                            'transition-all duration-500 ease-out rounded-full',
                             isCompleted ? 'bg-green-600 dark:bg-green-500' : 'bg-primary'
                          )}
                          aria-label={`${item.title} progress: ${Math.round(progress)}%`}
@@ -392,6 +410,56 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
   const PlaylistIcon = getPlaylistIcon(playlist.category);
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobileScreen) return;
+    e.preventDefault();
+    setIsResizing(true);
+    setStartX(e.clientX);
+    setInitialPlaylistWidth(playlistWidth);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isMobileScreen) return;
+    // e.preventDefault(); // Can cause issues with scrolling on touch devices if not handled carefully
+    setIsResizing(true);
+    setStartX(e.touches[0].clientX);
+    setInitialPlaylistWidth(playlistWidth);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
+      if (!isResizing || isMobileScreen || !containerRef.current) return;
+      const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const deltaX = currentX - startX;
+      let newWidth = initialPlaylistWidth - deltaX; // Dragging left decreases deltaX, increasing width
+
+      const maxAllowedWidth = containerRef.current.offsetWidth * MAX_PLAYLIST_WIDTH_PERCENTAGE;
+      newWidth = Math.max(MIN_PLAYLIST_WIDTH, Math.min(newWidth, maxAllowedWidth));
+      setPlaylistWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizing) {
+        setIsResizing(false);
+      }
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleMouseMove);
+      document.addEventListener('touchend', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('touchend', handleMouseUp);
+    };
+  }, [isResizing, startX, initialPlaylistWidth, isMobileScreen]);
+
+
   return (
     <Card className="overflow-hidden shadow-lg border rounded-xl">
       <CardHeader className="border-b bg-muted/30 p-3 sm:p-4">
@@ -409,8 +477,14 @@ const LearningContent: React.FC<LearningContentProps> = ({
       </CardHeader>
 
       <CardContent className="p-0">
-        <div className="flex flex-col md:flex-row">
-          <div className="w-full md:flex-grow relative aspect-video bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner">
+        <div ref={containerRef} className="flex flex-col md:flex-row">
+          <div className={cn(
+            "w-full relative bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner",
+             isMobileScreen ? "aspect-video" : "md:flex-1" // flex-1 allows it to grow
+             // Add min-width for video player on desktop to prevent it from becoming too small
+            // This is implicitly handled by playlist max width, but can be explicit:
+            // !isMobileScreen && "md:min-w-[40%]"
+          )}>
             {isVideoLoading && activeVideo && (
                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-md z-10 text-center p-4 animate-pulseFast">
                    <Loader2 className="h-10 w-10 sm:h-14 sm:w-14 text-primary animate-spin mb-3 sm:mb-4" />
@@ -442,20 +516,40 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     allowFullScreen
                     className={cn(
                       "block absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out",
-                      isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100" 
+                      isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100"
                      )}
-                    key={`${activeVideo.id}-${activeVideoStartTime}`} // Key change forces re-render if start time changes for same video
+                    key={`${activeVideo.id}-${activeVideoStartTime}`}
                     onLoad={handleIframeLoad}
-                    src={iframeRef.current?.src || "about:blank"} 
+                    src={iframeRef.current?.src || "about:blank"}
                   ></iframe>
               )}
           </div>
 
+          {!isMobileScreen && (playlist?.videos?.length || 0) > 0 && (
+            <div
+                className={cn(
+                    "hidden md:flex w-2 bg-border cursor-col-resize items-center justify-center group hover:bg-primary/20 transition-colors",
+                    isResizing && "bg-primary/30"
+                )}
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStart}
+            >
+                <GripVertical className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+            </div>
+          )}
+
+
           {(playlist?.videos?.length || 0) > 0 && (
-            <div className="w-full md:w-80 lg:w-96 xl:w-[26rem] border-t md:border-t-0 md:border-l bg-background/70 md:bg-muted/20 flex flex-col flex-shrink-0 backdrop-blur-sm">
-               <ScrollArea 
-                className="flex-grow h-[50vh] sm:h-[55vh] md:h-[calc(var(--vh,1vh)*100-theme(spacing.16)-theme(spacing.16))] md:max-h-[calc(100vh-theme(spacing.16)-theme(spacing.4))]"
-                style={{ '--vh': '1vh' } as React.CSSProperties} // For more accurate vh on mobile
+            <div
+                className={cn(
+                    "w-full md:flex-shrink-0 border-t md:border-t-0 md:border-l bg-background/70 md:bg-muted/20 flex flex-col backdrop-blur-sm",
+                    isMobileScreen ? "h-[50vh] sm:h-[55vh]" : "" // Fixed height for mobile, dynamic for desktop playlist
+                )}
+                style={!isMobileScreen ? { width: `${playlistWidth}px` } : {}}
+            >
+               <ScrollArea
+                className="flex-grow md:h-[calc(var(--vh,1vh)*100-theme(spacing.16)-theme(spacing.16)-2px)] md:max-h-[calc(100vh-theme(spacing.16)-theme(spacing.4)-2px)]" // Adjusted for border
+                style={{ '--vh': '1vh' } as React.CSSProperties}
                >
                  <div className="p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
                      {renderedPlaylistItems}
