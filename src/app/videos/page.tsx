@@ -1,7 +1,7 @@
 // src/app/videos/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
 import { VideoPlayer } from '@/components/videos/VideoPlayer';
@@ -10,7 +10,6 @@ import { CATEGORIES, SAMPLE_PLAYLIST_DATA, type PlaylistData } from '@/lib/const
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-
 
 function VideosPageContent() {
   const searchParams = useSearchParams();
@@ -27,13 +26,15 @@ function VideosPageContent() {
 
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
 
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const videoPlayerRef = useRef<HTMLDivElement>(null);
+  const videoInfoRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    // Set initial video for the active category or when category changes
     const newPlaylist = SAMPLE_PLAYLIST_DATA[activeCategory];
     setCurrentVideoId(newPlaylist?.videos[0]?.id || null);
   }, [activeCategory]);
 
-  // Effect to update activeCategory if query param changes after initial load (e.g. browser back/forward)
   useEffect(() => {
     const tabFromQuery = searchParams.get('tab');
     const isValidTab = CATEGORIES.some(c => c.id === tabFromQuery);
@@ -41,11 +42,31 @@ function VideosPageContent() {
       setActiveCategory(tabFromQuery);
     }
   }, [searchParams, activeCategory]);
+  
+  useEffect(() => {
+    // Dynamically set CSS variables for sticky calculations
+    const root = document.documentElement;
+    const headerHeight = document.querySelector('header')?.offsetHeight || 64; // Fallback header height
+    root.style.setProperty('--header-height', `${headerHeight}px`);
+
+    if (tabsRef.current) {
+      root.style.setProperty('--tabs-height', `${tabsRef.current.offsetHeight}px`);
+    }
+    if (videoPlayerRef.current) {
+       // Calculate aspect ratio height for video player (16:9)
+      const playerWidth = videoPlayerRef.current.offsetWidth;
+      const playerHeight = (playerWidth * 9) / 16;
+      root.style.setProperty('--video-player-aspect-ratio-height', `${playerHeight}px`);
+    }
+     if (videoInfoRef.current) {
+      root.style.setProperty('--video-info-height', `${videoInfoRef.current.offsetHeight}px`);
+    }
+
+  }, [activeCategory, currentVideoId]); // Re-calculate if these change, as layout might shift
 
 
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
-    // VideoId will be updated by the useEffect hook when activeCategory changes
   };
 
   const handleVideoSelect = (videoId: string) => {
@@ -57,70 +78,74 @@ function VideosPageContent() {
   }, [currentPlaylist, currentVideoId]);
 
   return (
-    <div className="space-y-6 md:space-y-8">
-      {/* Header removed as per request */}
-      <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange}>
-        {(tabId) => {
-          const playlist = SAMPLE_PLAYLIST_DATA[tabId];
-          if (!playlist || playlist.videos.length === 0) {
-            return (
-              <Card>
-                <CardContent className="pt-6">
-                  <p className="text-muted-foreground">No videos available for {CATEGORIES.find(c => c.id === tabId)?.label || 'this category'} yet. Stay tuned!</p>
-                </CardContent>
-              </Card>
-            );
-          }
+    <div className="space-y-0 md:space-y-4 lg:space-y-6">
+      <div ref={tabsRef} className="sticky top-[var(--header-height,64px)] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:pt-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm mb-4 md:mb-0">
+        <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange} />
+      </div>
+      
+      {(tabId) => { // This function wrapper is incorrect, TabNavigation expects children as a function
+        const playlist = SAMPLE_PLAYLIST_DATA[activeCategory]; // Use activeCategory directly
+        if (!playlist || playlist.videos.length === 0) {
           return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-              <div className="lg:col-span-2 md:space-y-4"> {/* No space-y on mobile, md:space-y-4 for desktop */}
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">No videos available for {CATEGORIES.find(c => c.id === activeCategory)?.label || 'this category'} yet. Stay tuned!</p>
+              </CardContent>
+            </Card>
+          );
+        }
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+            <div className="lg:col-span-2 space-y-0 md:space-y-4">
+              <div ref={videoPlayerRef} className="sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px))] md:top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+1rem)] z-30">
                 <VideoPlayer 
                   videoId={selectedVideo?.id || ""} 
                   title={selectedVideo?.title || "Select a video"}
                   isStuckToBottom={!!selectedVideo}
                 />
-                 {selectedVideo && (
-                  <Card className="shadow-lg rounded-none rounded-b-lg md:rounded-lg mt-0">
-                    <CardHeader className="p-3 md:px-6 md:py-4">
-                      <CardTitle className="text-lg md:text-xl">{selectedVideo.title}</CardTitle>
+              </div>
+               {selectedVideo && (
+                <div ref={videoInfoRef} className="sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+_var(--video-player-aspect-ratio-height,0px))] md:top-auto md:static z-20 md:z-auto -mt-[1px] md:mt-0">
+                  <Card className="shadow-lg rounded-none rounded-b-lg md:rounded-lg mt-0 ">
+                    <CardHeader className="p-3 md:px-4 md:py-3">
+                      <CardTitle className="text-sm md:text-base lg:text-lg">{selectedVideo.title}</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-3 pt-0 md:px-6 md:pb-4">
-                      <CardDescription className="text-xs sm:text-sm text-muted-foreground">
-                        Now playing: {selectedVideo.title}. Choose another video from the playlist to continue learning.
+                    <CardContent className="p-3 pt-0 md:px-4 md:pb-3">
+                      <CardDescription className="text-xs md:text-sm text-muted-foreground">
+                        Now playing: {selectedVideo.title}.
                       </CardDescription>
                     </CardContent>
                   </Card>
-                )}
-                {!selectedVideo && playlist.videos.length > 0 && (
-                   <Card className="shadow-lg"> {/* This card retains default styling */}
-                    <CardHeader className="py-4">
-                      <CardTitle className="text-xl md:text-2xl">Welcome to {playlist.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pb-4">
-                      <CardDescription className="text-sm text-muted-foreground">
-                        Select a video from the playlist on the right to start watching.
-                      </CardDescription>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-              <div className="lg:col-span-1">
-                <VideoPlaylist
-                  playlistName={playlist.name}
-                  videos={playlist.videos}
-                  currentVideoId={currentVideoId}
-                  onVideoSelect={handleVideoSelect}
-                />
-              </div>
+                </div>
+              )}
+              {!selectedVideo && playlist.videos.length > 0 && (
+                 <Card className="shadow-lg">
+                  <CardHeader className="py-4">
+                    <CardTitle className="text-xl md:text-2xl">Welcome to {playlist.name}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    <CardDescription className="text-sm text-muted-foreground">
+                      Select a video from the playlist on the right to start watching.
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+              )}
             </div>
-          );
-        }}
-      </TabNavigation>
+            <div className="lg:col-span-1">
+              <VideoPlaylist
+                playlistName={playlist.name}
+                videos={playlist.videos}
+                currentVideoId={currentVideoId}
+                onVideoSelect={handleVideoSelect}
+              />
+            </div>
+          </div>
+        );
+      }}
     </div>
   );
 }
 
-// Wrap with Suspense for useSearchParams
 export default function VideosPage() {
   return (
     <Suspense fallback={<VideosPageSkeleton />}>
@@ -132,26 +157,20 @@ export default function VideosPage() {
 function VideosPageSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
-      {/* Skeleton for removed header */}
-      {/* <header className="mb-6">
-        <Skeleton className="h-12 w-3/4 mb-2" />
-        <Skeleton className="h-6 w-1/2" />
-      </header> */}
-      <div className="flex space-x-2 mb-6">
+      <div className="flex space-x-2 mb-6 sticky top-[var(--header-height,64px)] z-40 bg-background md:pt-2 p-4">
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-2 space-y-4"> {/* Keep space-y-4 for skeleton consistency */}
-          <Skeleton className="aspect-video w-full rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-lg" />
+        <div className="lg:col-span-2 space-y-4">
+          <Skeleton className="aspect-video w-full rounded-lg sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px))] md:top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+1rem)] z-30" />
+          <Skeleton className="h-20 w-full rounded-lg sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+_var(--video-player-aspect-ratio-height,0px))] md:static z-20" />
         </div>
         <div className="lg:col-span-1">
-          <Skeleton className="h-[calc(100vh-16rem)] max-h-[550px] w-full rounded-lg" />
+          <Skeleton className="h-[calc(100vh-16rem)] max-h-[550px] w-full rounded-lg sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+_1.5rem)] md:top-[calc(var(--header-height,64px)_+_1.5rem)]" />
         </div>
       </div>
     </div>
   );
 }
-

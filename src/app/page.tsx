@@ -96,15 +96,9 @@ const roadmapSteps: RoadmapStep[] = [
 
 const RoadmapStepCard = ({ step, index, totalSteps }: { step: RoadmapStep; index: number; totalSteps: number }) => {
   const isEven = index % 2 === 0;
-  // Bubble dimensions: lg:h-24 lg:w-24 (6rem), default h-20 w-20 (5rem)
-  // Connector line will attach to card from the 1rem padding area of its container.
-  // Bubble radius is 2.5rem (for 5rem diameter bubble)
-  // Card container padding is md:p-4 (1rem)
 
   return (
     <div className={`relative flex flex-col ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} items-center group ${index === totalSteps - 1 ? 'mb-0' : 'mb-12 md:mb-24'}`}>
-      {/* Content Card container */}
-      {/* For md screens, card takes up 50% width minus bubble radius (2.5rem), with 1rem padding */}
       <div className="w-full md:w-[calc(50%_-_2.5rem)] p-3 md:p-4 mt-4 md:mt-0">
         <Card className={`relative w-full shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out border-2 ${step.cardBorderClass} bg-card`}>
           <CardHeader className="p-5 md:p-6 pb-2 md:pb-3">
@@ -127,26 +121,23 @@ const RoadmapStepCard = ({ step, index, totalSteps }: { step: RoadmapStep; index
             </Link>
           </CardContent>
           
-          {/* Horizontal connector line from Card to Bubble's timeline area */}
           <div
             className={cn(
-              "hidden md:block absolute top-1/2 -translate-y-1/2 w-4 h-[2px] z-[5]", // w-4 is 1rem, h-[2px] for thickness
-              isEven ? "right-[-1rem]" : "left-[-1rem]", // Positioned in the 1rem padding gap of parent
-              step.cardBorderClass ? step.cardBorderClass.replace('border-', 'bg-') : 'bg-border' // Use step's border color or fallback
+              "hidden md:block absolute top-1/2 -translate-y-1/2 w-4 h-[2px] z-[5]", 
+              isEven ? "right-[-1rem]" : "left-[-1rem]", 
+              step.cardBorderClass ? step.cardBorderClass.replace('border-', 'bg-') : 'bg-border'
             )}
           />
-          {/* Arrowhead pointing towards the bubble on the timeline */}
           <div
             className={cn(
               "hidden md:block absolute top-1/2 -translate-y-1/2 w-[8px] h-[8px] transform rotate-45 z-[5]",
-              isEven ? "right-[-1rem] mr-[-4px]" : "left-[-1rem] ml-[-4px]", // Positioned at the end of the line, slightly offset
-              step.cardBorderClass ? step.cardBorderClass.replace('border-', 'bg-') : 'bg-border' // Use step's border color or fallback
+              isEven ? "right-[-1rem] mr-[-4px]" : "left-[-1rem] ml-[-4px]", 
+              step.cardBorderClass ? step.cardBorderClass.replace('border-', 'bg-') : 'bg-border'
             )}
           />
         </Card>
       </div>
 
-      {/* Bubble (on the timeline for Desktop) */}
       <div className={`hidden md:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 items-center justify-center h-20 w-20 lg:h-24 lg:w-24 rounded-full border-4 ${step.cardBorderClass} bg-background shadow-xl z-10`}>
         <step.icon className={`h-10 w-10 lg:h-12 lg:w-12 ${step.iconColorClass}`} />
       </div>
@@ -168,8 +159,6 @@ export default function HomePage() {
       </header>
 
       <div className="relative mt-8 md:mt-12">
-        {/* Central line for desktop timeline */}
-        {/* This line visually connects the bubbles vertically. */}
         <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-border to-transparent -translate-x-1/2 z-0"></div>
         
         {roadmapSteps.map((step, index) => (
@@ -177,11 +166,12 @@ export default function HomePage() {
         ))}
       </div>
 
-      <footer className="text-center mt-16 md:mt-24 pt-8 border-t">
+      {/* Footer removed as it's now part of RootLayout */}
+      {/* <footer className="text-center mt-16 md:mt-24 pt-8 border-t">
         <p className="text-muted-foreground">
           Ready to dive in? Explore our <Link href="/videos" className="font-medium text-primary hover:underline">Video Playlists</Link> and <Link href="/resources" className="font-medium text-primary hover:underline">Curated Resources</Link>.
         </p>
-      </footer>
+      </footer> */}
     </div>
   );
 }

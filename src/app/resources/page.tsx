@@ -1,7 +1,7 @@
 // src/app/resources/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
 import { CATEGORIES, SAMPLE_RESOURCES_DATA, type ResourceLink } from '@/lib/constants';
@@ -14,13 +14,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 function ResourcesPageContent() {
   const searchParams = useSearchParams();
   const initialTabFromQuery = searchParams.get('tab');
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   const [activeCategory, setActiveCategory] = useState<string>(() => {
     const isValidTab = CATEGORIES.some(c => c.id === initialTabFromQuery);
     return isValidTab && initialTabFromQuery ? initialTabFromQuery : CATEGORIES[0].id;
   });
 
-  // Effect to update activeCategory if query param changes after initial load
   useEffect(() => {
     const tabFromQuery = searchParams.get('tab');
     const isValidTab = CATEGORIES.some(c => c.id === tabFromQuery);
@@ -29,33 +29,50 @@ function ResourcesPageContent() {
     }
   }, [searchParams, activeCategory]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const headerHeight = document.querySelector('header')?.offsetHeight || 64; 
+    root.style.setProperty('--header-height', `${headerHeight}px`);
+    if (tabsRef.current) {
+      root.style.setProperty('--tabs-height', `${tabsRef.current.offsetHeight}px`);
+    }
+  }, [activeCategory]);
+
+
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
     // Optionally update URL: window.history.pushState(null, '', `?tab=${tabId}`);
   };
+  
+  const currentCategoryLabel = CATEGORIES.find(c => c.id === activeCategory)?.label || 'Resources';
 
   return (
-    <div className="space-y-8">
-      <header className="mb-6">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Curated Resources</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          Discover hand-picked articles, documentation, and tools to supplement your learning.
+    <div className="space-y-0 md:space-y-4 lg:space-y-6">
+      <header className="mb-4 md:mb-6 pt-2 md:pt-0">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Curated {currentCategoryLabel} Resources</h1>
+        <p className="mt-1 text-md text-muted-foreground sm:text-lg">
+          Hand-picked articles, docs, and tools.
         </p>
       </header>
-      <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange}>
-        {(tabId) => {
-          const resources = SAMPLE_RESOURCES_DATA[tabId];
+
+      <div ref={tabsRef} className="sticky top-[var(--header-height,64px)] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:pt-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm mb-4 md:mb-0">
+         <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange} />
+      </div>
+      
+      {/* Content for the active tab */}
+      {(() => {
+          const resources = SAMPLE_RESOURCES_DATA[activeCategory];
           if (!resources || resources.length === 0) {
             return (
-              <Card>
+              <Card className="mt-6">
                 <CardContent className="pt-6">
-                  <p className="text-muted-foreground">No resources available for {CATEGORIES.find(c => c.id === tabId)?.label || 'this category'} yet. Check back soon!</p>
+                  <p className="text-muted-foreground">No resources available for {CATEGORIES.find(c => c.id === activeCategory)?.label || 'this category'} yet. Check back soon!</p>
                 </CardContent>
               </Card>
             );
           }
           return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
               {resources.map((resource: ResourceLink) => (
                 <Card key={resource.id} className="flex flex-col shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1">
                   <CardHeader>
@@ -78,13 +95,11 @@ function ResourcesPageContent() {
               ))}
             </div>
           );
-        }}
-      </TabNavigation>
+        })()}
     </div>
   );
 }
 
-// Wrap with Suspense for useSearchParams
 export default function ResourcesPage() {
   return (
     <Suspense fallback={<ResourcesPageSkeleton />}>
@@ -97,15 +112,15 @@ function ResourcesPageSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
       <header className="mb-6">
-        <Skeleton className="h-12 w-3/4 mb-2" />
-        <Skeleton className="h-6 w-1/2" />
+        <Skeleton className="h-10 w-3/4 mb-2" />
+        <Skeleton className="h-5 w-1/2" />
       </header>
-      <div className="flex space-x-2 mb-6">
+      <div className="flex space-x-2 mb-6 sticky top-[var(--header-height,64px)] z-40 bg-background md:pt-2 p-4">
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
         {[1, 2, 3].map(i => (
           <div key={i} className="space-y-3 rounded-lg border p-4">
             <Skeleton className="h-6 w-3/4" />

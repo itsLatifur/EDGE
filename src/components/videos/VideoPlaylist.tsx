@@ -15,12 +15,16 @@ interface VideoPlaylistProps {
 
 export function VideoPlaylist({ playlistName, videos, currentVideoId, onVideoSelect }: VideoPlaylistProps) {
   return (
-    <Card className="shadow-xl">
+    <Card className="shadow-xl sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+_1.5rem)] md:top-[calc(var(--header-height,64px)_+_1.5rem)]">
       <CardHeader>
-        <CardTitle className="text-2xl">{playlistName}</CardTitle>
+        <CardTitle className="text-xl md:text-2xl">{playlistName}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[calc(100vh-20rem)] max-h-[600px] pr-3"> {/* Dynamic height calculation */}
+        <ScrollArea 
+          className="h-[calc(100vh-var(--header-height,64px)-var(--tabs-height,58px)-var(--video-player-aspect-ratio-height,0px)-var(--video-info-height,0px)-10rem)] 
+                     md:h-[calc(100vh-var(--header-height,64px)-12rem)] 
+                     max-h-[400px] md:max-h-[500px] lg:max-h-[600px] pr-3"
+        >
           <div className="space-y-3">
             {videos.map((video) => (
               <button
@@ -28,14 +32,14 @@ export function VideoPlaylist({ playlistName, videos, currentVideoId, onVideoSel
                 onClick={() => onVideoSelect(video.id)}
                 aria-pressed={video.id === currentVideoId}
                 className={cn(
-                  "flex items-center w-full p-3 rounded-lg transition-all duration-200 ease-in-out group",
+                  "flex items-center w-full p-2 md:p-3 rounded-lg transition-all duration-200 ease-in-out group",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   video.id === currentVideoId 
                     ? "bg-primary/10 ring-2 ring-primary shadow-lg" 
                     : "bg-card hover:bg-accent/10 hover:shadow-md"
                 )}
               >
-                <div className="relative w-28 h-16 mr-4 rounded-md overflow-hidden shrink-0 shadow-sm">
+                <div className="relative w-24 h-14 md:w-28 md:h-16 mr-3 md:mr-4 rounded-md overflow-hidden shrink-0 shadow-sm">
                   <Image
                     src={video.thumbnailUrl}
                     alt={video.title}
@@ -49,13 +53,13 @@ export function VideoPlaylist({ playlistName, videos, currentVideoId, onVideoSel
                   />
                    {video.id === currentVideoId && (
                     <div className="absolute inset-0 bg-primary/50 flex items-center justify-center">
-                      <PlayCircle className="h-8 w-8 text-primary-foreground" />
+                      <PlayCircle className="h-6 w-6 md:h-8 md:w-8 text-primary-foreground" />
                     </div>
                   )}
                 </div>
                 <div className="text-left">
                     <span className={cn(
-                        "text-sm font-medium line-clamp-2",
+                        "text-xs md:text-sm font-medium line-clamp-2", // Adjusted: default text-xs, md:text-sm
                         video.id === currentVideoId ? "text-primary" : "text-card-foreground group-hover:text-accent-foreground"
                     )}>
                     {video.title}
