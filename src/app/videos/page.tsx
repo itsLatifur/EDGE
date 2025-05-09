@@ -83,65 +83,59 @@ function VideosPageContent() {
         <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange} />
       </div>
       
-      {(tabId) => { // This function wrapper is incorrect, TabNavigation expects children as a function
-        const playlist = SAMPLE_PLAYLIST_DATA[activeCategory]; // Use activeCategory directly
-        if (!playlist || playlist.videos.length === 0) {
-          return (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground">No videos available for {CATEGORIES.find(c => c.id === activeCategory)?.label || 'this category'} yet. Stay tuned!</p>
-              </CardContent>
-            </Card>
-          );
-        }
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
-            <div className="lg:col-span-2 space-y-0 md:space-y-4">
-              <div ref={videoPlayerRef} className="sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px))] md:top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+1rem)] z-30">
-                <VideoPlayer 
-                  videoId={selectedVideo?.id || ""} 
-                  title={selectedVideo?.title || "Select a video"}
-                  isStuckToBottom={!!selectedVideo}
-                />
-              </div>
-               {selectedVideo && (
-                <div ref={videoInfoRef} className="sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+_var(--video-player-aspect-ratio-height,0px))] md:top-auto md:static z-20 md:z-auto -mt-[1px] md:mt-0">
-                  <Card className="shadow-lg rounded-none rounded-b-lg md:rounded-lg mt-0 ">
-                    <CardHeader className="p-3 md:px-4 md:py-3">
-                      <CardTitle className="text-sm md:text-base lg:text-lg">{selectedVideo.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 md:px-4 md:pb-3">
-                      <CardDescription className="text-xs md:text-sm text-muted-foreground">
-                        Now playing: {selectedVideo.title}.
-                      </CardDescription>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-              {!selectedVideo && playlist.videos.length > 0 && (
-                 <Card className="shadow-lg">
-                  <CardHeader className="py-4">
-                    <CardTitle className="text-xl md:text-2xl">Welcome to {playlist.name}</CardTitle>
+      {(!currentPlaylist || currentPlaylist.videos.length === 0) ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">No videos available for {CATEGORIES.find(c => c.id === activeCategory)?.label || 'this category'} yet. Stay tuned!</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+          <div className="lg:col-span-2 space-y-0 md:space-y-4">
+            <div ref={videoPlayerRef} className="sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px))] md:top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+1rem)] z-30">
+              <VideoPlayer 
+                videoId={selectedVideo?.id || ""} 
+                title={selectedVideo?.title || "Select a video"}
+                isStuckToBottom={!!selectedVideo}
+              />
+            </div>
+             {selectedVideo && (
+              <div ref={videoInfoRef} className="sticky top-[calc(var(--header-height,64px)_+_var(--tabs-height,58px)_+_var(--video-player-aspect-ratio-height,0px))] md:top-auto md:static z-20 md:z-auto -mt-[1px] md:mt-0">
+                <Card className="shadow-lg rounded-none rounded-b-lg md:rounded-lg mt-0 ">
+                  <CardHeader className="p-3 md:px-4 md:py-3">
+                    <CardTitle className="text-sm md:text-base lg:text-lg">{selectedVideo.title}</CardTitle>
                   </CardHeader>
-                  <CardContent className="pb-4">
-                    <CardDescription className="text-sm text-muted-foreground">
-                      Select a video from the playlist on the right to start watching.
+                  <CardContent className="p-3 pt-0 md:px-4 md:pb-3">
+                    <CardDescription className="text-xs md:text-sm text-muted-foreground">
+                      Now playing: {selectedVideo.title}.
                     </CardDescription>
                   </CardContent>
                 </Card>
-              )}
-            </div>
-            <div className="lg:col-span-1">
-              <VideoPlaylist
-                playlistName={playlist.name}
-                videos={playlist.videos}
-                currentVideoId={currentVideoId}
-                onVideoSelect={handleVideoSelect}
-              />
-            </div>
+              </div>
+            )}
+            {!selectedVideo && currentPlaylist.videos.length > 0 && (
+               <Card className="shadow-lg">
+                <CardHeader className="py-4">
+                  <CardTitle className="text-xl md:text-2xl">Welcome to {currentPlaylist.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="pb-4">
+                  <CardDescription className="text-sm text-muted-foreground">
+                    Select a video from the playlist on the right to start watching.
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        );
-      }}
+          <div className="lg:col-span-1">
+            <VideoPlaylist
+              playlistName={currentPlaylist.name}
+              videos={currentPlaylist.videos}
+              currentVideoId={currentVideoId}
+              onVideoSelect={handleVideoSelect}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -174,3 +168,4 @@ function VideosPageSkeleton() {
     </div>
   );
 }
+
