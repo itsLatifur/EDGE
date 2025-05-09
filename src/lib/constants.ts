@@ -1,5 +1,6 @@
 // src/lib/constants.ts
 export const NAV_LINKS = [
+  { href: "/", label: "Home" },
   { href: "/videos", label: "Videos" },
   { href: "/resources", label: "Resources" },
 ];

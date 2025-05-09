@@ -1,15 +1,24 @@
 // src/app/videos/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
 import { VideoPlayer } from '@/components/videos/VideoPlayer';
 import { VideoPlaylist } from '@/components/videos/VideoPlaylist';
 import { CATEGORIES, SAMPLE_PLAYLIST_DATA, type PlaylistData } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default function VideosPage() {
-  const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[0].id);
+
+function VideosPageContent() {
+  const searchParams = useSearchParams();
+  const initialTabFromQuery = searchParams.get('tab');
+
+  const [activeCategory, setActiveCategory] = useState<string>(() => {
+    const isValidTab = CATEGORIES.some(c => c.id === initialTabFromQuery);
+    return isValidTab && initialTabFromQuery ? initialTabFromQuery : CATEGORIES[0].id;
+  });
   
   const currentPlaylist: PlaylistData | undefined = useMemo(() => {
     return SAMPLE_PLAYLIST_DATA[activeCategory];
@@ -18,15 +27,26 @@ export default function VideosPage() {
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Set initial video for the default category or when category changes
-    const initialPlaylist = SAMPLE_PLAYLIST_DATA[activeCategory];
-    setCurrentVideoId(initialPlaylist?.videos[0]?.id || null);
+    // Set initial video for the active category or when category changes
+    const newPlaylist = SAMPLE_PLAYLIST_DATA[activeCategory];
+    setCurrentVideoId(newPlaylist?.videos[0]?.id || null);
   }, [activeCategory]);
+
+  // Effect to update activeCategory if query param changes after initial load (e.g. browser back/forward)
+  useEffect(() => {
+    const tabFromQuery = searchParams.get('tab');
+    const isValidTab = CATEGORIES.some(c => c.id === tabFromQuery);
+    if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
+      setActiveCategory(tabFromQuery);
+    }
+  }, [searchParams, activeCategory]);
 
 
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
     // VideoId will be updated by the useEffect hook when activeCategory changes
+    // Optionally update URL query param here if desired for navigation consistency
+    // window.history.pushState(null, '', `?tab=${tabId}`); // This might be too aggressive, consider user experience
   };
 
   const handleVideoSelect = (videoId: string) => {
@@ -101,6 +121,40 @@ export default function VideosPage() {
           );
         }}
       </TabNavigation>
+    </div>
+  );
+}
+
+// Wrap with Suspense for useSearchParams
+export default function VideosPage() {
+  return (
+    <Suspense fallback={<VideosPageSkeleton />}>
+      <VideosPageContent />
+    </Suspense>
+  );
+}
+
+function VideosPageSkeleton() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      <header className="mb-6">
+        <Skeleton className="h-12 w-3/4 mb-2" />
+        <Skeleton className="h-6 w-1/2" />
+      </header>
+      <div className="flex space-x-2 mb-6">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        <div className="lg:col-span-2 space-y-4">
+          <Skeleton className="aspect-video w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+        <div className="lg:col-span-1">
+          <Skeleton className="h-[calc(100vh-20rem)] max-h-[600px] w-full rounded-lg" />
+        </div>
+      </div>
     </div>
   );
 }

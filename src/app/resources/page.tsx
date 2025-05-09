@@ -1,18 +1,37 @@
 // src/app/resources/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
 import { CATEGORIES, SAMPLE_RESOURCES_DATA, type ResourceLink } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExternalLink } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default function ResourcesPage() {
-  const [activeCategory, setActiveCategory] = useState<string>(CATEGORIES[0].id);
+
+function ResourcesPageContent() {
+  const searchParams = useSearchParams();
+  const initialTabFromQuery = searchParams.get('tab');
+
+  const [activeCategory, setActiveCategory] = useState<string>(() => {
+    const isValidTab = CATEGORIES.some(c => c.id === initialTabFromQuery);
+    return isValidTab && initialTabFromQuery ? initialTabFromQuery : CATEGORIES[0].id;
+  });
+
+  // Effect to update activeCategory if query param changes after initial load
+  useEffect(() => {
+    const tabFromQuery = searchParams.get('tab');
+    const isValidTab = CATEGORIES.some(c => c.id === tabFromQuery);
+    if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
+      setActiveCategory(tabFromQuery);
+    }
+  }, [searchParams, activeCategory]);
 
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
+    // Optionally update URL: window.history.pushState(null, '', `?tab=${tabId}`);
   };
 
   return (
@@ -61,6 +80,41 @@ export default function ResourcesPage() {
           );
         }}
       </TabNavigation>
+    </div>
+  );
+}
+
+// Wrap with Suspense for useSearchParams
+export default function ResourcesPage() {
+  return (
+    <Suspense fallback={<ResourcesPageSkeleton />}>
+      <ResourcesPageContent />
+    </Suspense>
+  );
+}
+
+function ResourcesPageSkeleton() {
+  return (
+    <div className="space-y-8 animate-pulse">
+      <header className="mb-6">
+        <Skeleton className="h-12 w-3/4 mb-2" />
+        <Skeleton className="h-6 w-1/2" />
+      </header>
+      <div className="flex space-x-2 mb-6">
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+        <Skeleton className="h-10 w-24" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="space-y-3 rounded-lg border p-4">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
