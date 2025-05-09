@@ -1,18 +1,16 @@
 // src/app/page.tsx
-import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, CodeXml, Palette, Braces, Smartphone, GitMerge, Component } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface RoadmapStep {
   id: string;
   title: string;
   description: string;
   icon: LucideIcon;
-  imageSrc: string;
-  imageHint: string;
   learnMoreLink: string;
   iconBgClass: string;
   iconColorClass: string;
@@ -27,8 +25,6 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'HTML Fundamentals',
     description: 'Build the skeleton of websites. Learn about tags, elements, attributes, and semantic HTML for well-structured content.',
     icon: CodeXml,
-    imageSrc: 'https://picsum.photos/seed/html-coding/600/400',
-    imageHint: 'html code editor',
     learnMoreLink: '/videos?tab=html',
     iconBgClass: 'bg-orange-100 dark:bg-orange-900/40',
     iconColorClass: 'text-orange-600 dark:text-orange-400',
@@ -41,8 +37,6 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'CSS Styling',
     description: 'Bring your HTML to life. Master selectors, properties, layouts (Flexbox, Grid), and responsive design principles.',
     icon: Palette,
-    imageSrc: 'https://picsum.photos/seed/css-design/600/400',
-    imageHint: 'css color palette',
     learnMoreLink: '/videos?tab=css',
     iconBgClass: 'bg-blue-100 dark:bg-blue-900/40',
     iconColorClass: 'text-blue-600 dark:text-blue-400',
@@ -55,22 +49,18 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'JavaScript Essentials',
     description: 'Add interactivity and dynamic behavior. Understand variables, functions, DOM manipulation, and modern ES6+ features.',
     icon: Braces,
-    imageSrc: 'https://picsum.photos/seed/javascript-logic/600/400',
-    imageHint: 'javascript function code',
     learnMoreLink: '/videos?tab=javascript',
-    iconBgClass: 'bg-yellow-100 dark:bg-yellow-800/40', // yellow-900 can be too dark for bg
+    iconBgClass: 'bg-yellow-100 dark:bg-yellow-800/40',
     iconColorClass: 'text-yellow-600 dark:text-yellow-400',
     cardBorderClass: 'border-yellow-500 dark:border-yellow-600',
     titleColorClass: 'text-yellow-700 dark:text-yellow-300',
-    buttonClass: 'bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700 text-black dark:text-white', // Yellow often needs black text for contrast
+    buttonClass: 'bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700 text-black dark:text-white',
   },
   {
     id: 'responsive',
     title: 'Responsive Web Design',
     description: 'Ensure your websites look great on all devices. Learn about media queries, fluid layouts, and mobile-first strategies.',
     icon: Smartphone,
-    imageSrc: 'https://picsum.photos/seed/responsive-display/600/400',
-    imageHint: 'responsive devices screen',
     learnMoreLink: '/resources',
     iconBgClass: 'bg-green-100 dark:bg-green-900/40',
     iconColorClass: 'text-green-600 dark:text-green-400',
@@ -83,8 +73,6 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'Version Control with Git',
     description: 'Track changes, collaborate with others, and manage your codebase effectively using Git and platforms like GitHub.',
     icon: GitMerge,
-    imageSrc: 'https://picsum.photos/seed/git-workflow/600/400',
-    imageHint: 'git branches merge',
     learnMoreLink: '/resources',
     iconBgClass: 'bg-purple-100 dark:bg-purple-900/40',
     iconColorClass: 'text-purple-600 dark:text-purple-400',
@@ -97,8 +85,6 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'Intro to Frontend Frameworks',
     description: 'Explore powerful tools like React (and Next.js by extension) to build complex, scalable, and interactive user interfaces.',
     icon: Component,
-    imageSrc: 'https://picsum.photos/seed/framework-architecture/600/400',
-    imageHint: 'framework components diagram',
     learnMoreLink: '/videos',
     iconBgClass: 'bg-teal-100 dark:bg-teal-900/40',
     iconColorClass: 'text-teal-600 dark:text-teal-400',
@@ -110,26 +96,17 @@ const roadmapSteps: RoadmapStep[] = [
 
 const RoadmapStepCard = ({ step, index, totalSteps }: { step: RoadmapStep; index: number; totalSteps: number }) => {
   const isEven = index % 2 === 0;
+  // Bubble dimensions: lg:h-24 lg:w-24 (6rem), default h-20 w-20 (5rem)
+  // Connector line will attach to card from the 1rem padding area of its container.
+  // Bubble radius is 2.5rem (for 5rem diameter bubble)
+  // Card container padding is md:p-4 (1rem)
+
   return (
     <div className={`relative flex flex-col ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} items-center group ${index === totalSteps - 1 ? 'mb-0' : 'mb-12 md:mb-24'}`}>
-      {/* Image container */}
-      <div className="w-full md:w-[calc(50%-2.5rem)] p-3 md:p-4"> {/* 2.5rem is for half of bubble width */}
-        <div className="relative w-full aspect-[16/10] rounded-xl overflow-hidden shadow-xl transform transition-all duration-300 group-hover:scale-105 group-hover:shadow-primary/20">
-          <Image
-            src={step.imageSrc}
-            alt={`${step.title} illustration`}
-            fill
-            className="object-cover"
-            data-ai-hint={step.imageHint}
-            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 40vw"
-          />
-           <div className={`absolute inset-0 ${step.iconBgClass} opacity-20 group-hover:opacity-10 transition-opacity duration-300`}></div>
-        </div>
-      </div>
-
       {/* Content Card container */}
-      <div className="w-full md:w-[calc(50%-2.5rem)] p-3 md:p-4 mt-4 md:mt-0"> {/* 2.5rem for half of bubble width */}
-        <Card className={`w-full shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out border-2 ${step.cardBorderClass} bg-card`}>
+      {/* For md screens, card takes up 50% width minus bubble radius (2.5rem), with 1rem padding */}
+      <div className="w-full md:w-[calc(50%_-_2.5rem)] p-3 md:p-4 mt-4 md:mt-0">
+        <Card className={`relative w-full shadow-xl hover:shadow-2xl transition-shadow duration-300 ease-in-out border-2 ${step.cardBorderClass} bg-card`}>
           <CardHeader className="p-5 md:p-6 pb-2 md:pb-3">
             <div className="flex items-center md:hidden mb-2"> {/* Mobile Icon & Title */}
               <div className={`p-2.5 rounded-lg mr-3 ${step.iconBgClass} ring-1 ${step.cardBorderClass.replace('border-','ring-')}`}>
@@ -149,6 +126,23 @@ const RoadmapStepCard = ({ step, index, totalSteps }: { step: RoadmapStep; index
               </Button>
             </Link>
           </CardContent>
+          
+          {/* Horizontal connector line from Card to Bubble's timeline area */}
+          <div
+            className={cn(
+              "hidden md:block absolute top-1/2 -translate-y-1/2 w-4 h-[2px] z-[5]", // w-4 is 1rem, h-[2px] for thickness
+              isEven ? "right-[-1rem]" : "left-[-1rem]", // Positioned in the 1rem padding gap of parent
+              step.cardBorderClass ? step.cardBorderClass.replace('border-', 'bg-') : 'bg-border' // Use step's border color or fallback
+            )}
+          />
+          {/* Arrowhead pointing towards the bubble on the timeline */}
+          <div
+            className={cn(
+              "hidden md:block absolute top-1/2 -translate-y-1/2 w-[8px] h-[8px] transform rotate-45 z-[5]",
+              isEven ? "right-[-1rem] mr-[-4px]" : "left-[-1rem] ml-[-4px]", // Positioned at the end of the line, slightly offset
+              step.cardBorderClass ? step.cardBorderClass.replace('border-', 'bg-') : 'bg-border' // Use step's border color or fallback
+            )}
+          />
         </Card>
       </div>
 
@@ -175,7 +169,8 @@ export default function HomePage() {
 
       <div className="relative mt-8 md:mt-12">
         {/* Central line for desktop timeline */}
-        <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-1.5 bg-gradient-to-b from-transparent via-border to-transparent -translate-x-1/2 z-0"></div>
+        {/* This line visually connects the bubbles vertically. */}
+        <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-border to-transparent -translate-x-1/2 z-0"></div>
         
         {roadmapSteps.map((step, index) => (
           <RoadmapStepCard key={step.id} step={step} index={index} totalSteps={roadmapSteps.length} />
