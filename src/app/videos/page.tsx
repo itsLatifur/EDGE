@@ -45,8 +45,6 @@ function VideosPageContent() {
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
     // VideoId will be updated by the useEffect hook when activeCategory changes
-    // Optionally update URL query param here if desired for navigation consistency
-    // window.history.pushState(null, '', `?tab=${tabId}`); // This might be too aggressive, consider user experience
   };
 
   const handleVideoSelect = (videoId: string) => {
@@ -58,13 +56,8 @@ function VideosPageContent() {
   }, [currentPlaylist, currentVideoId]);
 
   return (
-    <div className="space-y-8">
-      <header className="mb-6">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Learn with Videos</h1>
-        <p className="mt-2 text-lg text-muted-foreground">
-          Explore curated video playlists on HTML, CSS, and JavaScript to kickstart your web development journey.
-        </p>
-      </header>
+    <div className="space-y-6 md:space-y-8">
+      {/* Header removed as per request */}
       <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange}>
         {(tabId) => {
           const playlist = SAMPLE_PLAYLIST_DATA[tabId];
@@ -86,11 +79,11 @@ function VideosPageContent() {
                 />
                  {selectedVideo && (
                   <Card className="shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-2xl">{selectedVideo.title}</CardTitle>
+                    <CardHeader className="py-4">
+                      <CardTitle className="text-xl md:text-2xl">{selectedVideo.title}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <CardDescription className="text-base">
+                    <CardContent className="pb-4">
+                      <CardDescription className="text-sm text-muted-foreground"> {/* Decreased text size here */}
                         Now playing: {selectedVideo.title}. Choose another video from the playlist to continue learning.
                       </CardDescription>
                     </CardContent>
@@ -98,11 +91,11 @@ function VideosPageContent() {
                 )}
                 {!selectedVideo && playlist.videos.length > 0 && (
                    <Card className="shadow-lg">
-                    <CardHeader>
-                      <CardTitle className="text-2xl">Welcome to {playlist.name}</CardTitle>
+                    <CardHeader className="py-4">
+                      <CardTitle className="text-xl md:text-2xl">Welcome to {playlist.name}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <CardDescription className="text-base">
+                    <CardContent className="pb-4">
+                      <CardDescription className="text-sm text-muted-foreground"> {/* Decreased text size here */}
                         Select a video from the playlist on the right to start watching.
                       </CardDescription>
                     </CardContent>
@@ -137,10 +130,11 @@ export default function VideosPage() {
 function VideosPageSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
-      <header className="mb-6">
+      {/* Skeleton for removed header */}
+      {/* <header className="mb-6">
         <Skeleton className="h-12 w-3/4 mb-2" />
         <Skeleton className="h-6 w-1/2" />
-      </header>
+      </header> */}
       <div className="flex space-x-2 mb-6">
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
@@ -149,12 +143,13 @@ function VideosPageSkeleton() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-4">
           <Skeleton className="aspect-video w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-20 w-full rounded-lg" /> {/* Adjusted skeleton height for smaller text card */}
         </div>
         <div className="lg:col-span-1">
-          <Skeleton className="h-[calc(100vh-20rem)] max-h-[600px] w-full rounded-lg" />
+          <Skeleton className="h-[calc(100vh-16rem)] max-h-[550px] w-full rounded-lg" /> {/* Adjusted max height */}
         </div>
       </div>
     </div>
   );
 }
+
