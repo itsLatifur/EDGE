@@ -4,6 +4,7 @@ import type { VideoItem } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { PlayCircle } from 'lucide-react';
 
 interface VideoPlaylistProps {
   playlistName: string;
@@ -14,12 +15,12 @@ interface VideoPlaylistProps {
 
 export function VideoPlaylist({ playlistName, videos, currentVideoId, onVideoSelect }: VideoPlaylistProps) {
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-xl">
       <CardHeader>
-        <CardTitle className="text-xl">{playlistName}</CardTitle>
+        <CardTitle className="text-2xl">{playlistName}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] pr-4"> {/* Adjust height as needed */}
+        <ScrollArea className="h-[calc(100vh-20rem)] max-h-[600px] pr-3"> {/* Dynamic height calculation */}
           <div className="space-y-3">
             {videos.map((video) => (
               <button
@@ -27,24 +28,39 @@ export function VideoPlaylist({ playlistName, videos, currentVideoId, onVideoSel
                 onClick={() => onVideoSelect(video.id)}
                 aria-pressed={video.id === currentVideoId}
                 className={cn(
-                  "flex items-center w-full p-2 rounded-md transition-all duration-150 ease-in-out",
-                  "hover:bg-accent/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  video.id === currentVideoId ? "bg-accent ring-2 ring-primary" : "bg-card hover:bg-accent/50"
+                  "flex items-center w-full p-3 rounded-lg transition-all duration-200 ease-in-out group",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  video.id === currentVideoId 
+                    ? "bg-primary/10 ring-2 ring-primary shadow-lg" 
+                    : "bg-card hover:bg-accent/10 hover:shadow-md"
                 )}
               >
-                <div className="relative w-24 h-14 mr-3 rounded overflow-hidden shrink-0">
+                <div className="relative w-28 h-16 mr-4 rounded-md overflow-hidden shrink-0 shadow-sm">
                   <Image
                     src={video.thumbnailUrl}
                     alt={video.title}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover"
+                    className={cn(
+                        "object-cover transition-transform duration-300 ease-in-out",
+                        video.id === currentVideoId ? "scale-100" : "group-hover:scale-105"
+                    )}
                     data-ai-hint="video thumbnail"
                   />
+                   {video.id === currentVideoId && (
+                    <div className="absolute inset-0 bg-primary/50 flex items-center justify-center">
+                      <PlayCircle className="h-8 w-8 text-primary-foreground" />
+                    </div>
+                  )}
                 </div>
-                <span className="text-sm font-medium text-left line-clamp-2 text-card-foreground">
-                  {video.title}
-                </span>
+                <div className="text-left">
+                    <span className={cn(
+                        "text-sm font-medium line-clamp-2",
+                        video.id === currentVideoId ? "text-primary" : "text-card-foreground group-hover:text-accent-foreground"
+                    )}>
+                    {video.title}
+                    </span>
+                </div>
               </button>
             ))}
           </div>

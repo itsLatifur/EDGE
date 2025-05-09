@@ -26,9 +26,13 @@ export function TabNavigation({
 
   return (
     <Tabs defaultValue={effectiveDefaultTab} className="w-full" onValueChange={onTabChange}>
-      <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 mb-6">
+      <TabsList className="inline-flex h-auto items-center justify-start w-full overflow-x-auto rounded-lg bg-muted p-1.5 text-muted-foreground mb-6 space-x-1.5 shadow-inner">
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.id} value={tab.id} className="text-sm sm:text-base py-2.5">
+          <TabsTrigger
+            key={tab.id}
+            value={tab.id}
+            className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-xs sm:text-sm font-semibold ring-offset-background transition-all duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md flex-shrink-0 hover:bg-background/70 data-[state=active]:hover:bg-background"
+          >
             {tab.label}
           </TabsTrigger>
         ))}

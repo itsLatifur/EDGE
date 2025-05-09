@@ -17,7 +17,12 @@ export default function ResourcesPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Helpful Resources</h1>
+      <header className="mb-6">
+        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">Curated Resources</h1>
+        <p className="mt-2 text-lg text-muted-foreground">
+          Discover hand-picked articles, documentation, and tools to supplement your learning.
+        </p>
+      </header>
       <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange}>
         {(tabId) => {
           const resources = SAMPLE_RESOURCES_DATA[tabId];
@@ -33,18 +38,20 @@ export default function ResourcesPage() {
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {resources.map((resource: ResourceLink) => (
-                <Card key={resource.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+                <Card key={resource.id} className="flex flex-col shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1">
                   <CardHeader>
-                    <CardTitle className="text-lg">{resource.title}</CardTitle>
-                    <CardDescription className="capitalize text-xs">{resource.type}</CardDescription>
+                    <CardTitle className="text-xl">{resource.title}</CardTitle>
+                    <CardDescription className="capitalize text-xs font-medium text-primary pt-1">
+                      {resource.type}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-grow">
                     <p className="text-sm text-muted-foreground line-clamp-3">{resource.description}</p>
                   </CardContent>
-                  <div className="p-6 pt-0">
-                    <Button asChild variant="outline" className="w-full">
+                  <div className="p-6 pt-2">
+                    <Button asChild variant="default" className="w-full group">
                       <a href={resource.url} target="_blank" rel="noopener noreferrer">
-                        Visit Resource <ExternalLink className="ml-2 h-4 w-4" />
+                        Visit Resource <ExternalLink className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
                       </a>
                     </Button>
                   </div>

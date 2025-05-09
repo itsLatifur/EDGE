@@ -8,96 +8,96 @@ body {
 
 @layer base {
   :root {
-    --background: 34 78% 91%; /* Antique White #FAEBD7 */
-    --foreground: 240 100% 27%; /* Dark Blue #00008B */
+    --background: 240 60% 99%; /* Very Light Cool Gray */
+    --foreground: 240 10% 20%; /* Dark Slate Blue */
 
-    --card: 34 78% 95%; /* Lighter Antique White */
-    --card-foreground: 240 100% 27%;
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 240 10% 20%;
 
-    --popover: 34 78% 95%;
-    --popover-foreground: 240 100% 27%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 20%;
 
-    --primary: 240 60% 50%; /* A medium, vibrant blue */
-    --primary-foreground: 34 78% 98%; /* Very light Antique White / near white */
+    --primary: 260 70% 60%; /* Vibrant Violet */
+    --primary-foreground: 0 0% 100%; /* White */
 
-    --secondary: 240 40% 80%; /* Lighter blue for secondary elements */
-    --secondary-foreground: 240 100% 27%;
+    --secondary: 250 50% 96%; /* Light Lavender Gray */
+    --secondary-foreground: 260 70% 40%; /* Darker Violet for Secondary Text */
 
-    --muted: 240 30% 85%;
-    --muted-foreground: 240 50% 45%; /* Darker muted text for light bg */
+    --muted: 240 20% 92%; /* Cool Light Gray */
+    --muted-foreground: 240 15% 55%; /* Medium Gray */
 
-    --accent: 220 70% 60%; /* A distinct accent blue */
-    --accent-foreground: 34 78% 98%;
+    --accent: 320 70% 65%; /* Bright Pink/Magenta */
+    --accent-foreground: 0 0% 100%; /* White */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 75% 55%; /* Bright Red */
+    --destructive-foreground: 0 0% 100%; /* White */
 
-    --border: 240 30% 75%;
-    --input: 240 30% 88%;
-    --ring: 240 60% 50%; /* Ring color matches primary */
+    --border: 240 20% 88%; /* Light Gray Border */
+    --input: 240 30% 95%; /* Very Light Gray Input BG */
+    --ring: 260 70% 65%; /* Vibrant Violet for Ring */
 
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-1: 260 70% 60%; /* primary */
+    --chart-2: 320 70% 65%; /* accent */
+    --chart-3: 200 70% 60%; /* teal */
+    --chart-4: 30 80% 65%;  /* orange */
+    --chart-5: 120 50% 55%; /* green */
     --radius: 0.5rem;
 
-    /* Sidebar variables (keeping them for potential future use, but theming them consistently) */
-    --sidebar-background: 34 78% 93%; /* Slightly off Antique White */
-    --sidebar-foreground: 240 100% 27%;
-    --sidebar-primary: 240 60% 50%;
-    --sidebar-primary-foreground: 34 78% 98%;
-    --sidebar-accent: 220 70% 60%;
-    --sidebar-accent-foreground: 34 78% 98%;
-    --sidebar-border: 240 30% 75%;
-    --sidebar-ring: 240 60% 50%;
+    /* Sidebar variables */
+    --sidebar-background: 250 40% 97%; /* Slightly darker than page bg, light lavender tone */
+    --sidebar-foreground: 240 10% 25%;
+    --sidebar-primary: 260 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 320 70% 60%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 240 20% 85%;
+    --sidebar-ring: 260 70% 65%;
   }
 
   .dark {
-    --background: 240 100% 27%; /* Dark Blue #00008B */
-    --foreground: 34 78% 91%; /* Antique White #FAEBD7 */
+    --background: 270 35% 12%; /* Deep Violet */
+    --foreground: 270 25% 92%; /* Light Lavender Gray */
 
-    --card: 240 100% 20%; /* Darker Blue */
-    --card-foreground: 34 78% 91%;
+    --card: 270 30% 18%; /* Slightly Lighter Deep Violet for Cards */
+    --card-foreground: 270 25% 92%;
 
-    --popover: 240 100% 20%;
-    --popover-foreground: 34 78% 91%;
+    --popover: 270 30% 15%; /* Darker Popover BG */
+    --popover-foreground: 270 25% 92%;
 
-    --primary: 34 70% 85%; /* A lighter, prominent Antique White for primary actions */
-    --primary-foreground: 240 100% 15%; /* Very dark blue */
+    --primary: 280 80% 75%; /* Bright Lavender/Pink */
+    --primary-foreground: 280 30% 15%; /* Dark Violet for contrast on bright primary */
 
-    --secondary: 34 40% 60%; /* Darker Antique White for secondary elements */
-    --secondary-foreground: 34 78% 91%;
-
-    --muted: 34 30% 45%; /* Muted Antique White shade */
-    --muted-foreground: 34 50% 75%; /* Lighter muted text for dark bg */
-
-    --accent: 40 80% 80%; /* A distinct accent Antique White/goldish */
-    --accent-foreground: 240 100% 15%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 34 30% 40%;
-    --input: 34 30% 35%;
-    --ring: 34 70% 85%; /* Ring color matches primary */
+    --secondary: 270 25% 25%; /* Darker Muted Violet */
+    --secondary-foreground: 270 30% 80%; /* Lighter Muted Violet Text */
     
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --muted: 270 20% 22%; /* Very Dark Muted Violet */
+    --muted-foreground: 270 20% 65%; /* Lighter Muted Grayish Violet */
+
+    --accent: 170 70% 60%; /* Contrasting Teal/Cyan */
+    --accent-foreground: 170 30% 15%; /* Dark Teal for text on accent */
+
+    --destructive: 0 65% 60%; /* Vivid Red */
+    --destructive-foreground: 0 0% 100%; /* White */
+
+    --border: 270 20% 30%; /* Muted Violet Border */
+    --input: 270 25% 22%; /* Dark Violet Input BG */
+    --ring: 280 80% 80%; /* Bright Lavender/Pink for Ring */
+    
+    --chart-1: 280 80% 75%; /* primary */
+    --chart-2: 170 70% 60%; /* accent */
+    --chart-3: 220 70% 70%; /* light blue */
+    --chart-4: 40 80% 70%;  /* gold */
+    --chart-5: 320 70% 75%; /* pink */
 
     /* Sidebar variables (dark mode) */
-    --sidebar-background: 240 100% 22%; /* Slightly darker blue for sidebar */
-    --sidebar-foreground: 34 78% 91%;
-    --sidebar-primary: 34 70% 85%;
-    --sidebar-primary-foreground: 240 100% 15%;
-    --sidebar-accent: 40 80% 80%;
-    --sidebar-accent-foreground: 240 100% 15%;
-    --sidebar-border: 34 30% 40%;
-    --sidebar-ring: 34 70% 85%;
+    --sidebar-background: 270 30% 15%; /* Slightly darker than main bg */
+    --sidebar-foreground: 270 25% 90%;
+    --sidebar-primary: 280 80% 70%;
+    --sidebar-primary-foreground: 280 30% 10%;
+    --sidebar-accent: 170 70% 55%;
+    --sidebar-accent-foreground: 170 30% 10%;
+    --sidebar-border: 270 20% 25%;
+    --sidebar-ring: 280 80% 80%;
   }
 }
 
