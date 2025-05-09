@@ -55,7 +55,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isMobileScreen, setIsMobileScreen] = useState(false);
-  const [playlistWidth, setPlaylistWidth] = useState<number>(DEFAULT_PLAYLIST_WIDTH); 
+  const [playlistWidth, setPlaylistWidth] = useState<number>(DEFAULT_PLAYLIST_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [startX, setStartX] = useState(0);
   const [initialPlaylistWidth, setInitialPlaylistWidth] = useState(0);
@@ -117,7 +117,12 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     (item) => !userProgress[item.id]?.completed
                 );
                 videoToPlay = firstUnwatched || playlist.videos[0];
-                determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
+                if (videoToPlay) { // Ensure videoToPlay is not null
+                    determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
+                } else {
+                    // Fallback if playlist.videos[0] was also null somehow (empty playlist after filter)
+                    determinedStartTime = 0;
+                }
             }
         } else {
             const firstUnwatched = playlist.videos.find(
@@ -127,8 +132,12 @@ const LearningContent: React.FC<LearningContentProps> = ({
                 videoToPlay = firstUnwatched;
                 determinedStartTime = userProgress[firstUnwatched.id]?.watchedTime || 0;
             } else {
-                videoToPlay = playlist.videos[0];
-                determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
+                videoToPlay = playlist.videos[0]; // Assuming playlist.videos is not empty
+                 if (videoToPlay) { // Ensure videoToPlay is not null
+                    determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
+                } else {
+                    determinedStartTime = 0;
+                }
             }
         }
         setActiveVideo(videoToPlay);
@@ -439,7 +448,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
       if (!isResizing || isMobileScreen || !containerRef.current) return;
       const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const deltaX = currentX - startX;
-      let newConceptualWidth = initialPlaylistWidth - deltaX; 
+      let newConceptualWidth = initialPlaylistWidth - deltaX;
 
       const maxAllowedWidth = containerRef.current.offsetWidth * MAX_PLAYLIST_WIDTH_PERCENTAGE;
       const constrainedWidth = Math.max(MIN_DRAGGABLE_PLAYLIST_WIDTH, Math.min(newConceptualWidth, maxAllowedWidth));
@@ -486,22 +495,24 @@ const LearningContent: React.FC<LearningContentProps> = ({
       </CardHeader>
 
       <CardContent className="p-0">
-        <div 
-            ref={containerRef} 
+        <div
+            ref={containerRef}
             className={cn(
-                "flex", 
+                "flex",
                 currentLayoutIsVertical ? "flex-col" : "md:flex-row"
             )}
         >
           {/* Video Player Section */}
           <div className={cn(
             "relative bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner",
-            currentLayoutIsVertical ? "w-full" : "md:flex-1 md:min-w-0", 
+            currentLayoutIsVertical ? "w-full" : "md:flex-1 md:min-w-0",
           )}>
             <div className={cn(
-              "w-full aspect-[16/9] relative", 
-              !isMobileScreen && !currentLayoutIsVertical && "max-h-[calc(100vh-12rem)]", // Max height only if side-by-side on desktop
-              currentLayoutIsVertical && !isMobileScreen && "max-h-[calc(100vh-12rem-50vh-4rem)]" // Adjust max height if vertical on desktop
+              "w-full aspect-[16/9] relative",
+              // On desktop, constrain video height by viewport minus chrome, allowing page to scroll if video+playlist is tall.
+              // This applies for both side-by-side and vertical ("theatre mode") layouts on desktop.
+              !isMobileScreen && "max-h-[calc(100vh-12rem)]"
+              // Mobile height is determined by w-full and aspect ratio.
             )}>
               {isVideoLoading && activeVideo && (
                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-md z-10 text-center p-4 animate-pulseFast">
@@ -532,12 +543,12 @@ const LearningContent: React.FC<LearningContentProps> = ({
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
                       className={cn(
-                        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out", 
+                        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out",
                         isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100"
                        )}
-                      key={`${activeVideo.id}-${activeVideoStartTime}`}
+                      key={`${activeVideo.id}-${activeVideoStartTime}`} // Re-trigger iframe load on video or start time change
                       onLoad={handleIframeLoad}
-                      src={iframeRef.current?.src || "about:blank"}
+                      src={iframeRef.current?.src || "about:blank"} // Start with current or blank to avoid premature load
                     ></iframe>
                 )}
             </div>
@@ -562,11 +573,11 @@ const LearningContent: React.FC<LearningContentProps> = ({
           {(playlist?.videos?.length || 0) > 0 && (
             <div
                 className={cn(
-                    "flex flex-col backdrop-blur-sm", 
+                    "flex flex-col backdrop-blur-sm",
                     currentLayoutIsVertical
-                        ? "w-full h-[50vh] sm:h-[55vh] border-t bg-background/70" 
+                        ? "w-full h-[50vh] sm:h-[55vh] border-t bg-background/70"
                         // if not vertical, it's side-by-side, takes auto height from flex row
-                        : "md:flex-shrink-0 md:border-l md:bg-muted/20" 
+                        : "md:flex-shrink-0 md:border-l md:bg-muted/20"
                 )}
                 style={currentLayoutIsVertical ? {} : { width: `${playlistWidth}px` }}
             >
@@ -584,5 +595,3 @@ const LearningContent: React.FC<LearningContentProps> = ({
 };
 
 export default LearningContent;
-
-
