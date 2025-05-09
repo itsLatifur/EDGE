@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
@@ -7,7 +6,7 @@ import {Card, CardContent, CardHeader, CardTitle, CardDescription} from '@/compo
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {Progress} from '@/components/ui/progress';
 import {Button} from '@/components/ui/button';
-import {PlayCircle, CheckCircle, Circle, ListVideo, Clock, Loader2, TvMinimalPlay, GripVertical } from 'lucide-react';
+import {PlayCircle, CheckCircle, Circle, ListVideo, Clock, Loader2, TvMinimalPlay, RectangleHorizontal, Maximize, Minimize, PictureInPicture } from 'lucide-react';
 import {cn} from '@/lib/utils';
 import {
   Tooltip,
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/tooltip';
 import type { ContentItem, UserProgress, Playlist } from '@/types';
 import { getPlaylistIcon } from '@/lib/data/playlists';
+import { useToast } from '@/hooks/use-toast';
 
 interface LearningContentProps {
   playlist: Playlist;
@@ -33,10 +33,7 @@ const formatTime = (seconds: number): string => {
   return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
 }
 
-const MIN_DRAGGABLE_PLAYLIST_WIDTH = 200; // px, absolute minimum width the panel can be dragged to
-const LAYOUT_SWITCH_THRESHOLD_WIDTH = 320; // px, if playlist conceptual width < this, layout becomes vertical on desktop
-const DEFAULT_PLAYLIST_WIDTH = 384; // Approx 24rem
-const MAX_PLAYLIST_WIDTH_PERCENTAGE = 0.5; // Max 50% of container width for playlist
+type ViewMode = 'default' | 'theatre' | 'fullscreen';
 
 const LearningContent: React.FC<LearningContentProps> = ({
   playlist,
@@ -53,39 +50,25 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const lastReportedTimeRef = useRef<number>(0);
   const playlistItemRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoPlayerContainerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const [isMobileScreen, setIsMobileScreen] = useState(false);
-  const [playlistWidth, setPlaylistWidth] = useState<number>(DEFAULT_PLAYLIST_WIDTH);
-  const [isResizing, setIsResizing] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [initialPlaylistWidth, setInitialPlaylistWidth] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>('default');
+
 
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsMobileScreen(window.innerWidth < 768); // md breakpoint
+      const mobile = window.innerWidth < 768; // md breakpoint
+      setIsMobileScreen(mobile);
+      if (mobile && viewMode === 'theatre') { // Theatre mode doesn't make sense on mobile as it's already stacked
+        setViewMode('default');
+      }
     };
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
-
-    const savedWidth = localStorage.getItem('playlistWidth');
-    if (savedWidth) {
-        const parsedWidth = parseInt(savedWidth, 10);
-        const currentContainerWidth = containerRef.current?.offsetWidth || window.innerWidth;
-        const initialMaxWidth = currentContainerWidth * MAX_PLAYLIST_WIDTH_PERCENTAGE;
-        const constrainedInitialWidth = Math.max(MIN_DRAGGABLE_PLAYLIST_WIDTH, Math.min(parsedWidth, initialMaxWidth));
-        setPlaylistWidth(constrainedInitialWidth);
-    } else {
-        setPlaylistWidth(DEFAULT_PLAYLIST_WIDTH);
-    }
-
     return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
-  useEffect(() => {
-    if (!isMobileScreen) {
-        localStorage.setItem('playlistWidth', playlistWidth.toString());
-    }
-  }, [playlistWidth, isMobileScreen]);
+  }, [viewMode]);
 
 
   useEffect(() => {
@@ -117,10 +100,9 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     (item) => !userProgress[item.id]?.completed
                 );
                 videoToPlay = firstUnwatched || playlist.videos[0];
-                if (videoToPlay) { // Ensure videoToPlay is not null
+                if (videoToPlay) { 
                     determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
                 } else {
-                    // Fallback if playlist.videos[0] was also null somehow (empty playlist after filter)
                     determinedStartTime = 0;
                 }
             }
@@ -132,8 +114,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
                 videoToPlay = firstUnwatched;
                 determinedStartTime = userProgress[firstUnwatched.id]?.watchedTime || 0;
             } else {
-                videoToPlay = playlist.videos[0]; // Assuming playlist.videos is not empty
-                 if (videoToPlay) { // Ensure videoToPlay is not null
+                videoToPlay = playlist.videos[0]; 
+                 if (videoToPlay) { 
                     determinedStartTime = userProgress[videoToPlay.id]?.watchedTime || 0;
                 } else {
                     determinedStartTime = 0;
@@ -303,6 +285,44 @@ const LearningContent: React.FC<LearningContentProps> = ({
       return 'web development tutorial coding learn programming';
   }, []);
 
+  // View Mode Handlers
+  const handleToggleTheatreMode = () => {
+    if (isMobileScreen) return; // Theatre mode not applicable for mobile in this context
+    setViewMode(prev => prev === 'theatre' ? 'default' : 'theatre');
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
+  };
+
+  const handleToggleFullscreen = () => {
+    if (!videoPlayerContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      videoPlayerContainerRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+        toast({ title: "Fullscreen Error", description: "Could not enter fullscreen mode.", variant: "destructive" });
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+  
+  const handlePiPMode = () => {
+    toast({
+        title: "Picture-in-Picture",
+        description: "To use Picture-in-Picture, please use the native YouTube player's PiP button (if available).",
+        duration: 7000,
+    });
+  };
+
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setViewMode(document.fullscreenElement ? 'fullscreen' : 'default');
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
 
    const renderedPlaylistItems = useMemo(() => {
       if (!playlist?.videos) return [];
@@ -353,9 +373,9 @@ const LearningContent: React.FC<LearningContentProps> = ({
                         <Image
                            src={`https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`}
                            alt={`Thumbnail for ${item.title}`}
-                           fill // Changed from layout="fill"
-                           sizes="(max-width: 640px) 6rem, 7rem" // Added sizes prop
-                           objectFit="cover"
+                           fill
+                           sizes="(max-width: 640px) 6rem, 7rem"
+                           style={{objectFit:"cover"}}
                            className="transition-transform duration-300 group-hover:scale-105"
                            data-ai-hint={thumbnailHint}
                            unoptimized
@@ -427,62 +447,18 @@ const LearningContent: React.FC<LearningContentProps> = ({
    }, [playlist?.videos, activeVideo?.id, getVideoProgress, getWatchedTime, isVideoCompleted, getThumbnailHint, handlePlaylistItemClick]);
 
   const PlaylistIcon = getPlaylistIcon(playlist.category);
+  const isPlaylistVisible = viewMode !== 'fullscreen' && (playlist?.videos?.length || 0) > 0;
+  const layoutIsVertical = (isMobileScreen || viewMode === 'theatre') && viewMode !== 'fullscreen';
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isMobileScreen) return;
-    e.preventDefault();
-    setIsResizing(true);
-    setStartX(e.clientX);
-    setInitialPlaylistWidth(playlistWidth);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (isMobileScreen) return;
-    setIsResizing(true);
-    setStartX(e.touches[0].clientX);
-    setInitialPlaylistWidth(playlistWidth);
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent | TouchEvent) => {
-      if (!isResizing || isMobileScreen || !containerRef.current) return;
-      const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const deltaX = currentX - startX;
-      let newConceptualWidth = initialPlaylistWidth - deltaX;
-
-      const maxAllowedWidth = containerRef.current.offsetWidth * MAX_PLAYLIST_WIDTH_PERCENTAGE;
-      const constrainedWidth = Math.max(MIN_DRAGGABLE_PLAYLIST_WIDTH, Math.min(newConceptualWidth, maxAllowedWidth));
-      setPlaylistWidth(constrainedWidth);
-    };
-
-    const handleMouseUp = () => {
-      if (isResizing) {
-        setIsResizing(false);
-      }
-    };
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.addEventListener('touchmove', handleMouseMove);
-      document.addEventListener('touchend', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('touchmove', handleMouseMove);
-      document.removeEventListener('touchend', handleMouseUp);
-    };
-  }, [isResizing, startX, initialPlaylistWidth, isMobileScreen]);
-
-  const currentLayoutIsVertical = isMobileScreen || (!isMobileScreen && playlistWidth < LAYOUT_SWITCH_THRESHOLD_WIDTH);
 
   return (
-    <Card className="overflow-hidden shadow-lg border rounded-xl">
-      <CardHeader className="border-b bg-muted/30 p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div className="mb-2 sm:mb-0 flex-grow min-w-0">
+    <Card className={cn("overflow-hidden shadow-lg border rounded-xl", viewMode === 'fullscreen' && "fixed inset-0 z-[100] !rounded-none border-none")}>
+      <CardHeader className={cn(
+          "border-b bg-muted/30 p-3 sm:p-4",
+           viewMode === 'fullscreen' && "hidden" // Hide header in fullscreen
+          )}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex-grow min-w-0">
                 <CardTitle className="text-lg sm:text-xl font-bold text-primary flex items-center gap-2.5">
                    {PlaylistIcon && <PlaylistIcon className="h-5 w-5 sm:h-6 sm:w-6" />}
                    <span className="truncate">{playlist?.title || 'Playlist'}</span>
@@ -491,28 +467,64 @@ const LearningContent: React.FC<LearningContentProps> = ({
                     {(playlist?.videos?.length || 0)} videos {playlist.creator ? `・ By ${playlist.creator}` : ''} {playlist?.description ? `・ ${playlist.description}`: ''}
                 </CardDescription>
             </div>
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+                {!isMobileScreen && (
+                     <TooltipProvider delayDuration={100}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={handleToggleTheatreMode} className={cn(viewMode === 'theatre' && "bg-accent")}>
+                                    <RectangleHorizontal className="h-5 w-5" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom"><p>{viewMode === 'theatre' ? 'Exit Theatre Mode' : 'Theatre Mode'}</p></TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+                <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <Button variant="ghost" size="icon" onClick={handlePiPMode}>
+                                 <PictureInPicture className="h-5 w-5" />
+                             </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom"><p>Picture-in-Picture (Hint)</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={handleToggleFullscreen}>
+                                {viewMode === 'fullscreen' ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom"><p>{viewMode === 'fullscreen' ? 'Exit Fullscreen' : 'Fullscreen'}</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            </div>
           </div>
       </CardHeader>
 
-      <CardContent className="p-0">
+      <CardContent className={cn("p-0", viewMode === 'fullscreen' && "h-full w-full")}>
         <div
             ref={containerRef}
             className={cn(
                 "flex",
-                currentLayoutIsVertical ? "flex-col" : "md:flex-row"
+                layoutIsVertical ? "flex-col" : "flex-row",
+                viewMode === 'fullscreen' && "h-full w-full"
             )}
         >
           {/* Video Player Section */}
-          <div className={cn(
-            "relative bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner",
-            currentLayoutIsVertical ? "w-full" : "md:flex-1 md:min-w-0",
+          <div
+            ref={videoPlayerContainerRef}
+            className={cn(
+            "relative bg-gradient-to-br from-muted/60 to-muted/90 group",
+            layoutIsVertical ? "w-full" : "flex-1 min-w-0", // flex-1 allows it to grow
+            viewMode === 'fullscreen' ? "w-full h-full" : "shadow-inner"
           )}>
             <div className={cn(
               "w-full aspect-[16/9] relative",
-              // On desktop, constrain video height by viewport minus chrome, allowing page to scroll if video+playlist is tall.
-              // This applies for both side-by-side and vertical ("theatre mode") layouts on desktop.
-              !isMobileScreen && "max-h-[calc(100vh-12rem)]"
-              // Mobile height is determined by w-full and aspect ratio.
+              !isMobileScreen && viewMode !== 'fullscreen' && "max-h-[calc(100vh-12rem)]",
+              viewMode === 'fullscreen' && "h-full w-full" // Fullscreen takes entire container
             )}>
               {isVideoLoading && activeVideo && (
                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-md z-10 text-center p-4 animate-pulseFast">
@@ -546,40 +558,23 @@ const LearningContent: React.FC<LearningContentProps> = ({
                         "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out",
                         isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100"
                        )}
-                      key={`${activeVideo.id}-${activeVideoStartTime}`} // Re-trigger iframe load on video or start time change
+                      key={`${activeVideo.id}-${activeVideoStartTime}`}
                       onLoad={handleIframeLoad}
-                      src={iframeRef.current?.src || "about:blank"} // Start with current or blank to avoid premature load
+                      src={iframeRef.current?.src || "about:blank"}
                     ></iframe>
                 )}
             </div>
           </div>
 
-          {/* Resizer (Desktop Only, controls conceptual side-playlist width) */}
-           {!isMobileScreen && (playlist?.videos?.length || 0) > 0 && (
-            <div
-                className={cn(
-                    "hidden md:flex w-2 bg-border cursor-col-resize items-center justify-center group hover:bg-primary/20 transition-colors",
-                    isResizing && "bg-primary/30"
-                )}
-                onMouseDown={handleMouseDown}
-                onTouchStart={handleTouchStart}
-            >
-                <GripVertical className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-            </div>
-          )}
-
-
           {/* Playlist Section */}
-          {(playlist?.videos?.length || 0) > 0 && (
+          {isPlaylistVisible && (
             <div
                 className={cn(
                     "flex flex-col backdrop-blur-sm",
-                    currentLayoutIsVertical
+                    layoutIsVertical
                         ? "w-full h-[50vh] sm:h-[55vh] border-t bg-background/70"
-                        // if not vertical, it's side-by-side, takes auto height from flex row
-                        : "md:flex-shrink-0 md:border-l md:bg-muted/20"
+                        : "md:w-[384px] md:flex-shrink-0 md:border-l md:bg-muted/20" // Default desktop side playlist width
                 )}
-                style={currentLayoutIsVertical ? {} : { width: `${playlistWidth}px` }}
             >
                <ScrollArea className="flex-1">
                  <div className="p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
