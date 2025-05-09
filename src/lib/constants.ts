@@ -1,14 +1,23 @@
 // src/lib/constants.ts
+import type { LucideIcon } from 'lucide-react';
+import { CodeXml, Palette, Braces } from 'lucide-react';
+
 export const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/videos", label: "Videos" },
   { href: "/resources", label: "Resources" },
 ];
 
-export const CATEGORIES = [
-  { id: "html", label: "HTML" },
-  { id: "css", label: "CSS" },
-  { id: "javascript", label: "JavaScript" },
+export interface CategoryTab {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+export const CATEGORIES: CategoryTab[] = [
+  { id: "html", label: "HTML", icon: CodeXml },
+  { id: "css", label: "CSS", icon: Palette },
+  { id: "javascript", label: "JavaScript", icon: Braces },
 ];
 
 export interface VideoItem {
@@ -22,20 +31,6 @@ export interface PlaylistData {
   name: string;
   videos: VideoItem[];
 }
-
-// Using generic placeholder thumbnails for simplicity with next/image
-// In a real app, these would be actual YouTube thumbnail URLs.
-// https://i.ytimg.com/vi/<VIDEO_ID>/hqdefault.jpg for example.
-// For next/image with external URLs, ensure hostname is in next.config.js if not using picsum.
-// Since picsum is already configured, we'll use it for placeholders.
-// NOTE: The original request mentioned integrating a "selected YouTube playlist".
-// The video IDs provided here are real and can be used in an iframe.
-// The thumbnail URLs are constructed as if they were real YouTube thumbnails for better context.
-// However, to adhere strictly to placeholder image guidelines for `next/image`, picsum would be used if these were dynamic.
-// For this case, as they are static string URLs, they might work directly if `i.ytimg.com` is whitelisted.
-// Let's assume `i.ytimg.com` needs to be added to `next.config.js` remotePatterns if these were to be used with `next/image`.
-// For now, these URLs will be used directly by `img` tags or as background if `next/image` is problematic without config change.
-// To be safe and use `next/image` correctly with `data-ai-hint` for placeholders, let's switch to picsum.
 
 const placeholderBase = "https://picsum.photos/seed";
 
@@ -67,7 +62,7 @@ export const SAMPLE_PLAYLIST_DATA: Record<string, PlaylistData> = {
       { id: "W6NZfCO5SIk", title: "JavaScript Tutorial for Beginners", thumbnailUrl: `${placeholderBase}/js1/160/90` },
       { id: "jS4aFq5-91M", title: "Learn JavaScript - Full Course for Beginners", thumbnailUrl: `${placeholderBase}/js2/160/90` },
       { id: "PkZNo7MFNFg", title: "JavaScript Crash Course For Beginners", thumbnailUrl: `${placeholderBase}/js3/160/90` },
-      { id: "htznMG rebord", title: "Modern JavaScript Tutorial", thumbnailUrl: `${placeholderBase}/js4/160/90` },
+      { id: "htznMG rebord", title: "Modern JavaScript Tutorial", thumbnailUrl: `${placeholderBase}/js4/160/90` }, // Note: "rebord" might be a typo in original id, kept as is.
     ],
   },
 };
