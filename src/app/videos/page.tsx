@@ -9,6 +9,7 @@ import { VideoPlaylist } from '@/components/videos/VideoPlaylist';
 import { CATEGORIES, SAMPLE_PLAYLIST_DATA, type PlaylistData } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 
 function VideosPageContent() {
@@ -72,30 +73,31 @@ function VideosPageContent() {
           }
           return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-              <div className="lg:col-span-2 space-y-4">
+              <div className="lg:col-span-2 md:space-y-4"> {/* No space-y on mobile, md:space-y-4 for desktop */}
                 <VideoPlayer 
                   videoId={selectedVideo?.id || ""} 
                   title={selectedVideo?.title || "Select a video"}
+                  isStuckToBottom={!!selectedVideo}
                 />
                  {selectedVideo && (
-                  <Card className="shadow-lg">
-                    <CardHeader className="py-4">
-                      <CardTitle className="text-xl md:text-2xl">{selectedVideo.title}</CardTitle>
+                  <Card className="shadow-lg rounded-none rounded-b-lg md:rounded-lg mt-0">
+                    <CardHeader className="p-3 md:px-6 md:py-4">
+                      <CardTitle className="text-lg md:text-xl">{selectedVideo.title}</CardTitle>
                     </CardHeader>
-                    <CardContent className="pb-4">
-                      <CardDescription className="text-sm text-muted-foreground"> {/* Decreased text size here */}
+                    <CardContent className="p-3 pt-0 md:px-6 md:pb-4">
+                      <CardDescription className="text-xs sm:text-sm text-muted-foreground">
                         Now playing: {selectedVideo.title}. Choose another video from the playlist to continue learning.
                       </CardDescription>
                     </CardContent>
                   </Card>
                 )}
                 {!selectedVideo && playlist.videos.length > 0 && (
-                   <Card className="shadow-lg">
+                   <Card className="shadow-lg"> {/* This card retains default styling */}
                     <CardHeader className="py-4">
                       <CardTitle className="text-xl md:text-2xl">Welcome to {playlist.name}</CardTitle>
                     </CardHeader>
                     <CardContent className="pb-4">
-                      <CardDescription className="text-sm text-muted-foreground"> {/* Decreased text size here */}
+                      <CardDescription className="text-sm text-muted-foreground">
                         Select a video from the playlist on the right to start watching.
                       </CardDescription>
                     </CardContent>
@@ -141,12 +143,12 @@ function VideosPageSkeleton() {
         <Skeleton className="h-10 w-24" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4"> {/* Keep space-y-4 for skeleton consistency */}
           <Skeleton className="aspect-video w-full rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-lg" /> {/* Adjusted skeleton height for smaller text card */}
+          <Skeleton className="h-20 w-full rounded-lg" />
         </div>
         <div className="lg:col-span-1">
-          <Skeleton className="h-[calc(100vh-16rem)] max-h-[550px] w-full rounded-lg" /> {/* Adjusted max height */}
+          <Skeleton className="h-[calc(100vh-16rem)] max-h-[550px] w-full rounded-lg" />
         </div>
       </div>
     </div>

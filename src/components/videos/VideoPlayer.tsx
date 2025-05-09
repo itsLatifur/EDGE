@@ -1,20 +1,29 @@
 // src/components/videos/VideoPlayer.tsx
+import { cn } from "@/lib/utils";
+
 interface VideoPlayerProps {
   videoId: string;
   title: string;
+  isStuckToBottom?: boolean;
 }
 
-export function VideoPlayer({ videoId, title }: VideoPlayerProps) {
+export function VideoPlayer({ videoId, title, isStuckToBottom = false }: VideoPlayerProps) {
   if (!videoId) {
     return (
-      <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center">
+      <div className={cn(
+        "aspect-video w-full bg-muted flex items-center justify-center",
+        isStuckToBottom ? "rounded-t-lg md:rounded-lg" : "rounded-lg"
+      )}>
         <p className="text-muted-foreground">Select a video to play</p>
       </div>
     );
   }
 
   return (
-    <div className="aspect-video w-full rounded-lg overflow-hidden shadow-lg">
+    <div className={cn(
+      "aspect-video w-full overflow-hidden shadow-lg",
+      isStuckToBottom ? "rounded-t-lg md:rounded-lg" : "rounded-lg"
+    )}>
       <iframe
         width="100%"
         height="100%"
