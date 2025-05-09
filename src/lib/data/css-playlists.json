@@ -1,0 +1,34 @@
+[
+  {
+    "id": "PLDoPjvoNmCo7l1UE2m2t9x6PNTi0J0x-M",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PLDoPjvoNmCo7l1UE2m2t9x6PNTi0J0x-M",
+    "title": "CSS Full Course for Beginners",
+    "category": "css",
+    "description": "An in-depth CSS course from freeCodeCamp.org, covering selectors, properties, layout (Flexbox & Grid), and more.",
+    "creator": "freeCodeCamp.org"
+  },
+  {
+    "id": "PL4-IKwSrm2ttg_0z_po72gC7z4wB9Tj_A",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4-IKwSrm2ttg_0z_po72gC7z4wB9Tj_A",
+    "title": "Flexbox Simplified",
+    "category": "css",
+    "description": "Master CSS Flexbox layout with clear explanations and practical examples by Kevin Powell.",
+    "creator": "Kevin Powell"
+  },
+  {
+    "id": "PL4-IKwSrm2tu_8yYDAh_xP7k0L2k38_tI",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4-IKwSrm2tu_8yYDAh_xP7k0L2k38_tI",
+    "title": "CSS Grid Demystified",
+    "category": "css",
+    "description": "Learn the powerful CSS Grid layout system from scratch with Kevin Powell's detailed tutorials.",
+    "creator": "Kevin Powell"
+  },
+  {
+    "id": "PL4cUxeGkcC9h_sYJ3Jz4hPF5HASQnS3Yt",
+    "youtubePlaylistUrl": "https://www.youtube.com/playlist?list=PL4cUxeGkcC9h_sYJ3Jz4hPF5HASQnS3Yt",
+    "title": "CSS Animations & Transitions",
+    "category": "css",
+    "description": "Add smooth animations and transitions to your websites using modern CSS techniques with Traversy Media.",
+    "creator": "Traversy Media"
+  }
+]

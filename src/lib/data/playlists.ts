@@ -1,8 +1,12 @@
 
 import type { PlaylistType, PlaylistCollection, VideoCollection, ContentItem, PlaylistSummary, Playlist } from '@/types';
 import { Code, Palette, Zap } from 'lucide-react';
-import React from 'react';
-import playlistSourcesData from './playlist-sources.json'; // Import the new JSON data
+import type React from 'react'; // Use import type for React
+
+// Import the new JSON data files
+import htmlPlaylistSourcesData from './html-playlists.json';
+import cssPlaylistSourcesData from './css-playlists.json';
+import javascriptPlaylistSourcesData from './javascript-playlists.json';
 
 interface PlaylistSourceItem {
   id: string; // YouTube Playlist ID
@@ -13,9 +17,14 @@ interface PlaylistSourceItem {
   creator?: string;
 }
 
-const playlistSources: PlaylistSourceItem[] = playlistSourcesData;
+// Combine all playlist sources
+const playlistSources: PlaylistSourceItem[] = [
+  ...htmlPlaylistSourcesData,
+  ...cssPlaylistSourcesData,
+  ...javascriptPlaylistSourcesData,
+];
 
-// Helper function to extract YouTube Playlist ID from URL
+// Helper function to extract YouTube Playlist ID from URL (remains the same)
 export const extractPlaylistIdFromUrl = (url: string): string | null => {
   try {
     const parsedUrl = new URL(url);
@@ -31,7 +40,7 @@ export const extractPlaylistIdFromUrl = (url: string): string | null => {
 
 
 // --- 1. Playlist Summaries (for browsing) ---
-// Dynamically build playlistCategories from playlistSources
+// Dynamically build playlistCategories from the combined playlistSources
 export const playlistCategories: PlaylistCollection = {
   html: [],
   css: [],
@@ -62,11 +71,11 @@ playlistSources.forEach(source => {
 
 
 // --- 2. Video Data (indexed by YouTube playlist ID) ---
-// IMPORTANT: The keys here MUST match the 'id' from playlist-sources.json (which are YouTube Playlist IDs)
+// IMPORTANT: The keys here MUST match the 'id' from the respective JSON files (which are YouTube Playlist IDs)
 // The video 'id' fields are YouTube Video IDs.
 // 'playlistId' for each ContentItem should be the YouTube Playlist ID it belongs to.
 export const playlistVideos: VideoCollection = {
-  // HTML Playlists - IDs match those in playlist-sources.json
+  // HTML Playlists - IDs match those in html-playlists.json
   'PLDoPjvoNmCo_E_st7g3hGj9hBNP5m_4up': [ // HTML Full Course (freeCodeCamp.org)
     { id: 'UB1O30fR-EE', playlistId: 'PLDoPjvoNmCo_E_st7g3hGj9hBNP5m_4up', title: 'HTML Full Course - Build a Website Tutorial', url: 'https://www.youtube.com/embed/UB1O30fR-EE', duration: 10800, description: 'Learn HTML by building a website.' },
     { id: 'kUMe1FH4paE', playlistId: 'PLDoPjvoNmCo_E_st7g3hGj9hBNP5m_4up', title: 'Learn HTML – Full Tutorial for Beginners (2022)', url: 'https://www.youtube.com/embed/kUMe1FH4paE', duration: 3600, description: 'Another great HTML tutorial for beginners.' },
@@ -80,7 +89,7 @@ export const playlistVideos: VideoCollection = {
     { id: 'JsVj0ks7_Zw', playlistId: 'PL4-IKwSrm2tvK0f5N7f9f3j0HxVW7sJ0j', title: 'Understanding the section element', url: 'https://www.youtube.com/embed/JsVj0ks7_Zw', duration: 600, description: 'Deep dive into the <section> tag.' },
   ],
 
-  // CSS Playlists - IDs match those in playlist-sources.json
+  // CSS Playlists - IDs match those in css-playlists.json
   'PLDoPjvoNmCo7l1UE2m2t9x6PNTi0J0x-M': [ // CSS Full Course (freeCodeCamp.org)
     { id: 'OXGznpKZ_sA', playlistId: 'PLDoPjvoNmCo7l1UE2m2t9x6PNTi0J0x-M', title: 'CSS Full Course - Includes Flexbox and Grid', url: 'https://www.youtube.com/embed/OXGznpKZ_sA', duration: 14400, description: 'A complete guide to CSS.' },
   ],
@@ -96,7 +105,7 @@ export const playlistVideos: VideoCollection = {
      { id: 'zH5pgsAQUqs', playlistId: 'PL4cUxeGkcC9h_sYJ3Jz4hPF5HASQnS3Yt', title: 'CSS Transitions & Animations Crash Course', url: 'https://www.youtube.com/embed/zH5pgsAQUqs', duration: 1050, description: 'Learn CSS transitions and keyframe animations.' },
   ],
 
-  // JavaScript Playlists - IDs match those in playlist-sources.json
+  // JavaScript Playlists - IDs match those in javascript-playlists.json
   'PLDoPjvoNmCo_b2v25SjHMrjQiA9H9LhW-': [ // JavaScript Full Course (freeCodeCamp.org)
      { id: 'PkZNo7MFNFo', playlistId: 'PLDoPjvoNmCo_b2v25SjHMrjQiA9H9LhW-', title: 'JavaScript Programming - Full Course', url: 'https://www.youtube.com/embed/PkZNo7MFNFo', duration: 21600, description: 'Learn JavaScript from beginner to advanced.' },
   ],
