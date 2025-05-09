@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, {useState, useEffect, useRef, useCallback, useMemo} from 'react';
@@ -32,8 +33,10 @@ const formatTime = (seconds: number): string => {
   return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
 }
 
-const MIN_PLAYLIST_WIDTH = 280; // Approx 18rem
-const MAX_PLAYLIST_WIDTH_PERCENTAGE = 0.6; // Max 60% of container width
+const MIN_DRAGGABLE_PLAYLIST_WIDTH = 200; // px, absolute minimum width the panel can be dragged to
+const LAYOUT_SWITCH_THRESHOLD_WIDTH = 320; // px, if playlist conceptual width < this, layout becomes vertical on desktop
+const DEFAULT_PLAYLIST_WIDTH = 384; // Approx 24rem
+const MAX_PLAYLIST_WIDTH_PERCENTAGE = 0.5; // Max 50% of container width for playlist
 
 const LearningContent: React.FC<LearningContentProps> = ({
   playlist,
@@ -52,11 +55,10 @@ const LearningContent: React.FC<LearningContentProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [isMobileScreen, setIsMobileScreen] = useState(false);
-  const [playlistWidth, setPlaylistWidth] = useState<number>(384); // Default width (24rem)
+  const [playlistWidth, setPlaylistWidth] = useState<number>(DEFAULT_PLAYLIST_WIDTH); 
   const [isResizing, setIsResizing] = useState(false);
   const [startX, setStartX] = useState(0);
   const [initialPlaylistWidth, setInitialPlaylistWidth] = useState(0);
-
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -67,7 +69,13 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
     const savedWidth = localStorage.getItem('playlistWidth');
     if (savedWidth) {
-      setPlaylistWidth(parseInt(savedWidth, 10));
+        const parsedWidth = parseInt(savedWidth, 10);
+        const currentContainerWidth = containerRef.current?.offsetWidth || window.innerWidth;
+        const initialMaxWidth = currentContainerWidth * MAX_PLAYLIST_WIDTH_PERCENTAGE;
+        const constrainedInitialWidth = Math.max(MIN_DRAGGABLE_PLAYLIST_WIDTH, Math.min(parsedWidth, initialMaxWidth));
+        setPlaylistWidth(constrainedInitialWidth);
+    } else {
+        setPlaylistWidth(DEFAULT_PLAYLIST_WIDTH);
     }
 
     return () => window.removeEventListener('resize', checkScreenSize);
@@ -336,7 +344,8 @@ const LearningContent: React.FC<LearningContentProps> = ({
                         <Image
                            src={`https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`}
                            alt={`Thumbnail for ${item.title}`}
-                           layout="fill"
+                           fill // Changed from layout="fill"
+                           sizes="(max-width: 640px) 6rem, 7rem" // Added sizes prop
                            objectFit="cover"
                            className="transition-transform duration-300 group-hover:scale-105"
                            data-ai-hint={thumbnailHint}
@@ -420,7 +429,6 @@ const LearningContent: React.FC<LearningContentProps> = ({
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (isMobileScreen) return;
-    // e.preventDefault(); // Can cause issues with scrolling on touch devices if not handled carefully
     setIsResizing(true);
     setStartX(e.touches[0].clientX);
     setInitialPlaylistWidth(playlistWidth);
@@ -431,11 +439,11 @@ const LearningContent: React.FC<LearningContentProps> = ({
       if (!isResizing || isMobileScreen || !containerRef.current) return;
       const currentX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const deltaX = currentX - startX;
-      let newWidth = initialPlaylistWidth - deltaX; // Dragging left decreases deltaX, increasing width
+      let newConceptualWidth = initialPlaylistWidth - deltaX; 
 
       const maxAllowedWidth = containerRef.current.offsetWidth * MAX_PLAYLIST_WIDTH_PERCENTAGE;
-      newWidth = Math.max(MIN_PLAYLIST_WIDTH, Math.min(newWidth, maxAllowedWidth));
-      setPlaylistWidth(newWidth);
+      const constrainedWidth = Math.max(MIN_DRAGGABLE_PLAYLIST_WIDTH, Math.min(newConceptualWidth, maxAllowedWidth));
+      setPlaylistWidth(constrainedWidth);
     };
 
     const handleMouseUp = () => {
@@ -459,6 +467,7 @@ const LearningContent: React.FC<LearningContentProps> = ({
     };
   }, [isResizing, startX, initialPlaylistWidth, isMobileScreen]);
 
+  const currentLayoutIsVertical = isMobileScreen || (!isMobileScreen && playlistWidth < LAYOUT_SWITCH_THRESHOLD_WIDTH);
 
   return (
     <Card className="overflow-hidden shadow-lg border rounded-xl">
@@ -476,17 +485,23 @@ const LearningContent: React.FC<LearningContentProps> = ({
           </div>
       </CardHeader>
 
-      <CardContent className="p-0"> {/* p-0 to allow flex children to manage their own padding */}
-        <div ref={containerRef} className="flex flex-col md:flex-row"> {/* Main flex container for video and playlist */}
+      <CardContent className="p-0">
+        <div 
+            ref={containerRef} 
+            className={cn(
+                "flex", 
+                currentLayoutIsVertical ? "flex-col" : "md:flex-row"
+            )}
+        >
           {/* Video Player Section */}
           <div className={cn(
             "relative bg-gradient-to-br from-muted/60 to-muted/90 group shadow-inner",
-            isMobileScreen ? "w-full" : "md:flex-1 md:min-w-0", // flex-1 allows it to grow, min-w-0 for proper shrinking
+            currentLayoutIsVertical ? "w-full" : "md:flex-1 md:min-w-0", 
           )}>
-             {/* Aspect Ratio Enforcer and Content Holder for Video */}
             <div className={cn(
-              "w-full aspect-[16/9] relative", // Enforces 16:9, takes full width of its parent
-              !isMobileScreen && "max-h-[calc(100vh-12rem)]" // Max height on desktop (adjust 12rem as needed for headers/footers/padding)
+              "w-full aspect-[16/9] relative", 
+              !isMobileScreen && !currentLayoutIsVertical && "max-h-[calc(100vh-12rem)]", // Max height only if side-by-side on desktop
+              currentLayoutIsVertical && !isMobileScreen && "max-h-[calc(100vh-12rem-50vh-4rem)]" // Adjust max height if vertical on desktop
             )}>
               {isVideoLoading && activeVideo && (
                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-md z-10 text-center p-4 animate-pulseFast">
@@ -509,7 +524,6 @@ const LearningContent: React.FC<LearningContentProps> = ({
                      <p className="text-sm text-muted-foreground/80 mt-1.5">Check back soon for new content!</p>
                   </div>
               )}
-
                {activeVideo && (
                    <iframe
                       ref={iframeRef}
@@ -518,19 +532,19 @@ const LearningContent: React.FC<LearningContentProps> = ({
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
                       className={cn(
-                        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out", // Fills the aspect ratio container
+                        "absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out", 
                         isVideoLoading ? "opacity-0 pointer-events-none" : "opacity-100"
                        )}
                       key={`${activeVideo.id}-${activeVideoStartTime}`}
                       onLoad={handleIframeLoad}
-                      src={iframeRef.current?.src || "about:blank"} // Use current src to avoid re-render if only loading state changes
+                      src={iframeRef.current?.src || "about:blank"}
                     ></iframe>
                 )}
             </div>
           </div>
 
-          {/* Resizer (Desktop Only) */}
-          {!isMobileScreen && (playlist?.videos?.length || 0) > 0 && (
+          {/* Resizer (Desktop Only, controls conceptual side-playlist width) */}
+           {!isMobileScreen && (playlist?.videos?.length || 0) > 0 && (
             <div
                 className={cn(
                     "hidden md:flex w-2 bg-border cursor-col-resize items-center justify-center group hover:bg-primary/20 transition-colors",
@@ -543,16 +557,20 @@ const LearningContent: React.FC<LearningContentProps> = ({
             </div>
           )}
 
+
           {/* Playlist Section */}
           {(playlist?.videos?.length || 0) > 0 && (
             <div
                 className={cn(
-                    "w-full md:flex-shrink-0 border-t md:border-t-0 md:border-l bg-background/70 md:bg-muted/20 flex flex-col backdrop-blur-sm",
-                    isMobileScreen ? "h-[50vh] sm:h-[55vh]" : "", // On desktop, height is determined by flex row (align-items: stretch by default)
+                    "flex flex-col backdrop-blur-sm", 
+                    currentLayoutIsVertical
+                        ? "w-full h-[50vh] sm:h-[55vh] border-t bg-background/70" 
+                        // if not vertical, it's side-by-side, takes auto height from flex row
+                        : "md:flex-shrink-0 md:border-l md:bg-muted/20" 
                 )}
-                style={!isMobileScreen ? { width: `${playlistWidth}px` } : {}}
+                style={currentLayoutIsVertical ? {} : { width: `${playlistWidth}px` }}
             >
-               <ScrollArea className="flex-1"> {/* Use flex-1 to grow within the flex-col parent */}
+               <ScrollArea className="flex-1">
                  <div className="p-2 sm:p-2.5 space-y-1.5 sm:space-y-2">
                      {renderedPlaylistItems}
                  </div>
@@ -566,3 +584,5 @@ const LearningContent: React.FC<LearningContentProps> = ({
 };
 
 export default LearningContent;
+
+
