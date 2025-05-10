@@ -20,11 +20,11 @@ const categorySchema = z.object({
   iconName: z.enum(AVAILABLE_ICONS_FOR_TABS, { errorMap: () => ({ message: "Please select an icon" }) }),
 });
 
-type CategoryFormInputs = z.infer<typeof categorySchema>;
+export type CategoryFormInputs = z.infer<typeof categorySchema>;
 
 interface AddCategoryFormProps {
-  onCategoryAdded: (category: CategoryTab) => void;
-  existingCategories: CategoryTab[];
+  onCategoryAdded: (category: { id: string; label: string; iconName: keyof typeof LUCIDE_ICON_MAP }) => void;
+  existingCategories: CategoryTab[]; // Still CategoryTab for checking existence
 }
 
 export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCategoryFormProps) {
@@ -42,7 +42,6 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
 
   const onSubmit: SubmitHandler<CategoryFormInputs> = async (data) => {
     setIsLoading(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 300));
 
     if (existingCategories.find(cat => cat.id === data.id || cat.label.toLowerCase() === data.label.toLowerCase())) {
@@ -55,14 +54,13 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
       return;
     }
     
-    const IconComponent = LUCIDE_ICON_MAP[data.iconName];
-    const newCategory: CategoryTab = {
+    const newCategoryData = {
       id: data.id,
       label: data.label,
-      icon: IconComponent,
+      iconName: data.iconName,
     };
 
-    onCategoryAdded(newCategory); // Update parent state
+    onCategoryAdded(newCategoryData);
     toast({ title: "Category Added", description: `Category "${data.label}" has been successfully created.` });
     form.reset();
     setIsLoading(false);
@@ -78,7 +76,18 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
             <FormItem>
               <FormLabel>Category Label</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., React Hooks" {...field} />
+                <Input placeholder="e.g., React Hooks" {...field} 
+                  onChange={(e) => {
+                    const labelValue = e.target.value;
+                    field.onChange(labelValue);
+                    // Auto-generate ID from label if ID field is empty or matches old auto-generated ID
+                    const currentId = form.getValues("id");
+                    const autoId = labelValue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                    if (!currentId || currentId === form.getValues("label").toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')) {
+                         form.setValue("id", autoId, { shouldValidate: true });
+                    }
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -91,8 +100,10 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
             <FormItem>
               <FormLabel>Category ID</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., react-hooks (unique, no spaces)" {...field} 
-                  onChange={(e) => field.onChange(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                <Input 
+                  placeholder="e.g., react-hooks (auto-generated from label)" 
+                  {...field} 
+                  onChange={(e) => field.onChange(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}
                 />
               </FormControl>
               <FormMessage />
@@ -112,13 +123,13 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {AVAILABLE_ICONS_FOR_TABS.map(iconName => {
-                    const Icon = LUCIDE_ICON_MAP[iconName];
+                  {AVAILABLE_ICONS_FOR_TABS.map(iconNameKey => {
+                    const Icon = LUCIDE_ICON_MAP[iconNameKey];
                     return (
-                      <SelectItem key={iconName} value={iconName}>
+                      <SelectItem key={iconNameKey} value={iconNameKey}>
                         <div className="flex items-center">
                           <Icon className="mr-2 h-4 w-4" />
-                          {iconName}
+                          {iconNameKey}
                         </div>
                       </SelectItem>
                     );

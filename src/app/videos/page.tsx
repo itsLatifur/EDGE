@@ -1,30 +1,56 @@
 // src/app/videos/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect, Suspense, useRef } from 'react';
+import { useState, useMemo, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
 import { VideoPlayer } from '@/components/videos/VideoPlayer';
 import { VideoPlaylist } from '@/components/videos/VideoPlaylist';
-import { CATEGORIES, SAMPLE_PLAYLIST_DATA, type PlaylistData, getCategories, getPlaylistData } from '@/lib/constants';
+import { 
+    type PlaylistData, 
+    getCategories, 
+    getPlaylistData,
+    LUCIDE_ICON_MAP,
+    type CategoryTab
+} from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+
 
 function VideosPageContent() {
   const searchParams = useSearchParams();
   const initialTabFromQuery = searchParams.get('tab');
 
-  // Fetch categories and playlists dynamically
-  const [dynamicCategories, setDynamicCategories] = useState(() => getCategories());
-  const [dynamicPlaylists, setDynamicPlaylists] = useState(() => getPlaylistData());
+  const [dynamicCategories, setDynamicCategories] = useState<CategoryTab[]>([]);
+  const [dynamicPlaylists, setDynamicPlaylists] = useState<Record<string, PlaylistData>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-
-  const [activeCategory, setActiveCategory] = useState<string>(() => {
-    const isValidTab = dynamicCategories.some(c => c.id === initialTabFromQuery);
-    return isValidTab && initialTabFromQuery ? initialTabFromQuery : (dynamicCategories.length > 0 ? dynamicCategories[0].id : "");
-  });
+  const refreshData = useCallback(() => {
+    setIsLoading(true);
+    setDynamicCategories(getCategories());
+    setDynamicPlaylists(getPlaylistData());
+    setIsLoading(false);
+  }, []);
   
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+
+  const [activeCategory, setActiveCategory] = useState<string>("");
+   
+  useEffect(() => {
+    if (dynamicCategories.length > 0) {
+        const isValidTab = dynamicCategories.some(c => c.id === initialTabFromQuery);
+        // Set active category only if it's different or not set yet
+        const newActiveCategory = isValidTab && initialTabFromQuery ? initialTabFromQuery : dynamicCategories[0].id;
+        if (newActiveCategory !== activeCategory) {
+            setActiveCategory(newActiveCategory);
+        }
+    }
+  }, [initialTabFromQuery, dynamicCategories, activeCategory]);
+
+
   const currentPlaylist: PlaylistData | undefined = useMemo(() => {
     return dynamicPlaylists[activeCategory];
   }, [activeCategory, dynamicPlaylists]);
@@ -35,12 +61,6 @@ function VideosPageContent() {
   const videoPlayerRef = useRef<HTMLDivElement>(null);
   const videoInfoRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Update categories and playlists if they change (e.g., after admin updates)
-    // For this demo, this will re-fetch from the module-level exports
-    setDynamicCategories(getCategories());
-    setDynamicPlaylists(getPlaylistData());
-  }, []); // Could add a dependency if there was a global state update mechanism
 
   useEffect(() => {
     const newPlaylist = dynamicPlaylists[activeCategory];
@@ -49,18 +69,21 @@ function VideosPageContent() {
 
   useEffect(() => {
     const tabFromQuery = searchParams.get('tab');
-    const isValidTab = dynamicCategories.some(c => c.id === tabFromQuery);
-    if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
-      setActiveCategory(tabFromQuery);
-    } else if (!isValidTab && initialTabFromQuery && dynamicCategories.length > 0) {
-      // If query tab is invalid, default to first available category
-      setActiveCategory(dynamicCategories[0].id);
+    if (dynamicCategories.length > 0) {
+        const isValidTab = dynamicCategories.some(c => c.id === tabFromQuery);
+        if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
+          setActiveCategory(tabFromQuery);
+        } else if (!isValidTab && tabFromQuery && activeCategory !== dynamicCategories[0].id) {
+          // If query tab is no longer valid, default to first available
+          setActiveCategory(dynamicCategories[0].id);
+        }
     }
-  }, [searchParams, activeCategory, dynamicCategories, initialTabFromQuery]);
+  }, [searchParams, activeCategory, dynamicCategories]);
   
   useEffect(() => {
     const root = document.documentElement;
-    const headerHeight = document.querySelector('header')?.offsetHeight || 64; 
+    const headerElement = document.querySelector('header');
+    const headerHeight = headerElement ? headerElement.offsetHeight : 64; 
     root.style.setProperty('--header-height', `${headerHeight}px`);
 
     if (tabsRef.current) {
@@ -68,27 +91,37 @@ function VideosPageContent() {
     }
     if (videoPlayerRef.current) {
       const playerWidth = videoPlayerRef.current.offsetWidth;
-      const playerHeight = (playerWidth * 9) / 16;
+      const playerHeight = (playerWidth * 9) / 16; // Assuming 16:9 aspect ratio
       root.style.setProperty('--video-player-aspect-ratio-height', `${playerHeight}px`);
     }
      if (videoInfoRef.current) {
       root.style.setProperty('--video-info-height', `${videoInfoRef.current.offsetHeight}px`);
     }
 
-  }, [activeCategory, currentVideoId]);
+  }, [activeCategory, currentVideoId]); // Re-run if activeCategory or currentVideoId changes layout
 
 
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('tab', tabId);
+    window.history.pushState({ path: newUrl.href }, '', newUrl.href);
   };
 
   const handleVideoSelect = (videoId: string) => {
     setCurrentVideoId(videoId);
+     if (videoPlayerRef.current) {
+      videoPlayerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
   const selectedVideo = useMemo(() => {
     return currentPlaylist?.videos.find(v => v.id === currentVideoId);
   }, [currentPlaylist, currentVideoId]);
+
+  if (isLoading) {
+    return <VideosPageSkeleton />;
+  }
 
   if (dynamicCategories.length === 0) {
     return (
@@ -100,10 +133,15 @@ function VideosPageContent() {
     );
   }
 
+  const tabsForNavigation = dynamicCategories.map(cat => ({
+    ...cat,
+    icon: LUCIDE_ICON_MAP[cat.iconName] || LUCIDE_ICON_MAP.Video, // Fallback icon
+  }));
+
   return (
     <div className="space-y-0 md:space-y-4 lg:space-y-6">
       <div ref={tabsRef} className="sticky top-[var(--header-height,64px)] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:pt-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm mb-4 md:mb-0">
-        <TabNavigation tabs={dynamicCategories} defaultTab={activeCategory} onTabChange={handleTabChange} />
+        <TabNavigation tabs={tabsForNavigation} defaultTab={activeCategory} onTabChange={handleTabChange} />
       </div>
       
       {(!currentPlaylist || currentPlaylist.videos.length === 0) ? (
@@ -174,7 +212,7 @@ export default function VideosPage() {
 function VideosPageSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
-      <div className="flex space-x-2 mb-6 sticky top-[var(--header-height,64px)] z-40 bg-background md:pt-2 p-4">
+      <div className="flex space-x-2 mb-6 sticky top-[var(--header-height,64px)] z-40 bg-background md:pt-2 p-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm">
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
@@ -191,4 +229,3 @@ function VideosPageSkeleton() {
     </div>
   );
 }
-

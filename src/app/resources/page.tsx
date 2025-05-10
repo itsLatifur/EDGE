@@ -1,10 +1,16 @@
 // src/app/resources/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
-import { CATEGORIES, SAMPLE_RESOURCES_DATA, type ResourceLink, getCategories, getResourcesData } from '@/lib/constants';
+import { 
+    type ResourceLink, 
+    getCategories, 
+    getResourcesData,
+    LUCIDE_ICON_MAP,
+    type CategoryTab 
+} from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExternalLink } from 'lucide-react';
@@ -16,46 +22,76 @@ function ResourcesPageContent() {
   const initialTabFromQuery = searchParams.get('tab');
   const tabsRef = useRef<HTMLDivElement>(null);
 
-  // Fetch categories and resources dynamically
-  const [dynamicCategories, setDynamicCategories] = useState(() => getCategories());
-  const [dynamicResources, setDynamicResources] = useState(() => getResourcesData());
+  const [dynamicCategories, setDynamicCategories] = useState<CategoryTab[]>([]);
+  const [dynamicResources, setDynamicResources] = useState<Record<string, ResourceLink[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [activeCategory, setActiveCategory] = useState<string>(() => {
-    const isValidTab = dynamicCategories.some(c => c.id === initialTabFromQuery);
-    return isValidTab && initialTabFromQuery ? initialTabFromQuery : (dynamicCategories.length > 0 ? dynamicCategories[0].id : "");
-  });
-
-  useEffect(() => {
-    // Update categories and resources if they change
+  const refreshData = useCallback(() => {
+    setIsLoading(true);
     setDynamicCategories(getCategories());
     setDynamicResources(getResourcesData());
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    const tabFromQuery = searchParams.get('tab');
-    const isValidTab = dynamicCategories.some(c => c.id === tabFromQuery);
-    if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
-      setActiveCategory(tabFromQuery);
-    } else if (!isValidTab && initialTabFromQuery && dynamicCategories.length > 0) {
-      setActiveCategory(dynamicCategories[0].id);
+    refreshData();
+    // Optional: set up an interval or event listener if changes can happen without full page interaction
+    // For demo, we assume admin changes trigger navigation or state updates that lead to re-fetch
+    // const interval = setInterval(refreshData, 30000); // Example: refresh every 30s
+    // return () => clearInterval(interval);
+  }, [refreshData]);
+
+  const [activeCategory, setActiveCategory] = useState<string>("");
+
+  useEffect(() => {
+    if (dynamicCategories.length > 0) {
+      const isValidTab = dynamicCategories.some(c => c.id === initialTabFromQuery);
+      const newActiveCategory = isValidTab && initialTabFromQuery ? initialTabFromQuery : dynamicCategories[0].id;
+      if (newActiveCategory !== activeCategory) {
+        setActiveCategory(newActiveCategory);
+      }
     }
-  }, [searchParams, activeCategory, dynamicCategories, initialTabFromQuery]);
+  }, [initialTabFromQuery, dynamicCategories, activeCategory]);
+
+
+  useEffect(() => {
+    const tabFromQuery = searchParams.get('tab');
+    if (dynamicCategories.length > 0) {
+      const isValidTab = dynamicCategories.some(c => c.id === tabFromQuery);
+      if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
+        setActiveCategory(tabFromQuery);
+      } else if (!isValidTab && tabFromQuery && activeCategory !== dynamicCategories[0].id) {
+        // If query tab is no longer valid (e.g. deleted by admin), default to first available
+        setActiveCategory(dynamicCategories[0].id);
+      }
+    }
+  }, [searchParams, activeCategory, dynamicCategories]);
+
 
   useEffect(() => {
     const root = document.documentElement;
-    const headerHeight = document.querySelector('header')?.offsetHeight || 64; 
+    const headerElement = document.querySelector('header');
+    const headerHeight = headerElement ? headerElement.offsetHeight : 64; 
     root.style.setProperty('--header-height', `${headerHeight}px`);
     if (tabsRef.current) {
       root.style.setProperty('--tabs-height', `${tabsRef.current.offsetHeight}px`);
     }
-  }, [activeCategory]);
+  }, [activeCategory]); // Re-run if activeCategory changes which might affect layout slightly
 
 
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
+    // Update URL query param without full page reload
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('tab', tabId);
+    window.history.pushState({ path: newUrl.href }, '', newUrl.href);
   };
   
   const currentCategoryLabel = dynamicCategories.find(c => c.id === activeCategory)?.label || 'Resources';
+
+  if (isLoading) {
+    return <ResourcesPageSkeleton />;
+  }
 
   if (dynamicCategories.length === 0) {
     return (
@@ -66,6 +102,12 @@ function ResourcesPageContent() {
       </Card>
     );
   }
+  
+  const tabsForNavigation = dynamicCategories.map(cat => ({
+    ...cat,
+    icon: LUCIDE_ICON_MAP[cat.iconName] || LUCIDE_ICON_MAP.BookOpen, // Fallback icon
+  }));
+
 
   return (
     <div className="space-y-0 md:space-y-4 lg:space-y-6">
@@ -77,7 +119,7 @@ function ResourcesPageContent() {
       </header>
 
       <div ref={tabsRef} className="sticky top-[var(--header-height,64px)] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:pt-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm mb-4 md:mb-0">
-         <TabNavigation tabs={dynamicCategories} defaultTab={activeCategory} onTabChange={handleTabChange} />
+         <TabNavigation tabs={tabsForNavigation} defaultTab={activeCategory} onTabChange={handleTabChange} />
       </div>
       
       {(() => {
@@ -135,7 +177,7 @@ function ResourcesPageSkeleton() {
         <Skeleton className="h-10 w-3/4 mb-2" />
         <Skeleton className="h-5 w-1/2" />
       </header>
-      <div className="flex space-x-2 mb-6 sticky top-[var(--header-height,64px)] z-40 bg-background md:pt-2 p-4">
+      <div className="flex space-x-2 mb-6 sticky top-[var(--header-height,64px)] z-40 bg-background md:pt-2 p-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm">
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
         <Skeleton className="h-10 w-24" />
@@ -153,4 +195,3 @@ function ResourcesPageSkeleton() {
     </div>
   );
 }
-
