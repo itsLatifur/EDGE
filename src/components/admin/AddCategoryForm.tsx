@@ -14,17 +14,17 @@ import type { CategoryTab } from '@/lib/constants';
 import { AVAILABLE_ICONS_FOR_TABS, LUCIDE_ICON_MAP } from '@/lib/constants';
 import { useState } from 'react';
 
-const categorySchema = z.object({
+export const categoryFormSchema = z.object({
   id: z.string().min(2, { message: "ID must be at least 2 characters" }).regex(/^[a-z0-9-]+$/, { message: "ID can only contain lowercase letters, numbers, and hyphens" }),
   label: z.string().min(2, { message: "Label must be at least 2 characters" }),
   iconName: z.enum(AVAILABLE_ICONS_FOR_TABS, { errorMap: () => ({ message: "Please select an icon" }) }),
 });
 
-export type CategoryFormInputs = z.infer<typeof categorySchema>;
+export type CategoryFormInputs = z.infer<typeof categoryFormSchema>;
 
 interface AddCategoryFormProps {
   onCategoryAdded: (category: { id: string; label: string; iconName: keyof typeof LUCIDE_ICON_MAP }) => void;
-  existingCategories: CategoryTab[]; // Still CategoryTab for checking existence
+  existingCategories: CategoryTab[];
 }
 
 export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCategoryFormProps) {
@@ -32,7 +32,7 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<CategoryFormInputs>({
-    resolver: zodResolver(categorySchema),
+    resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       id: "",
       label: "",
@@ -82,8 +82,16 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
                     field.onChange(labelValue);
                     // Auto-generate ID from label if ID field is empty or matches old auto-generated ID
                     const currentId = form.getValues("id");
+                    // Generate potential autoId based on current label
                     const autoId = labelValue.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-                    if (!currentId || currentId === form.getValues("label").toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')) {
+                    
+                    // To check if the ID was previously auto-generated from an OLD label, we need the previous label.
+                    // This is tricky with react-hook-form's controlled inputs. A simpler approach:
+                    // Only auto-fill if ID is empty. User can then manually change it.
+                    // Or, if ID matches what WOULD have been generated from the PREVIOUS label value
+                    // (This part is hard to implement without storing previous label state explicitly)
+                    // Simplified: If ID is empty, auto-generate.
+                    if (!currentId && labelValue) {
                          form.setValue("id", autoId, { shouldValidate: true });
                     }
                   }}

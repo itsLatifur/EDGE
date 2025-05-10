@@ -28,7 +28,7 @@ import {
   AVAILABLE_ICONS_FOR_TABS,
   RESOURCE_LINK_TYPES
 } from '@/lib/constants';
-import { AddCategoryForm, type CategoryFormInputs as AddCategoryFormInputs } from './AddCategoryForm';
+import { AddCategoryForm, categoryFormSchema, type CategoryFormInputs } from './AddCategoryForm';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,8 +76,8 @@ export function ManageResourcesClient() {
   const [lastToastId, setLastToastId] = useState<string | null>(null);
 
 
-  const categoryEditForm = useForm<AddCategoryFormInputs>({
-    resolver: zodResolver(AddCategoryFormInputs), // Assuming AddCategoryFormInputs is exported from AddCategoryForm
+  const categoryEditForm = useForm<CategoryFormInputs>({ // Use CategoryFormInputs type
+    resolver: zodResolver(categoryFormSchema), // Use imported categoryFormSchema object
   });
 
   const resourceEditForm = useForm<ResourceFormInputs>({
@@ -147,7 +147,7 @@ export function ManageResourcesClient() {
     }
   };
 
-  const handleCategoryUpdate = async (data: AddCategoryFormInputs) => {
+  const handleCategoryUpdate = async (data: CategoryFormInputs) => {
     if (!editingCategory) return;
     setIsLoading(true);
     const oldCategory = categories.find(c => c.id === editingCategory.id);

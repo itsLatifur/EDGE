@@ -26,7 +26,7 @@ import {
   LUCIDE_ICON_MAP,
   AVAILABLE_ICONS_FOR_TABS
 } from '@/lib/constants';
-import { AddCategoryForm, type CategoryFormInputs as AddCategoryFormInputs } from './AddCategoryForm';
+import { AddCategoryForm, categoryFormSchema, type CategoryFormInputs } from './AddCategoryForm';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,8 +72,8 @@ export function ManageVideosClient() {
   const [lastAction, setLastAction] = useState<LastAction | null>(null);
   const [lastToastId, setLastToastId] = useState<string | null>(null);
 
-  const categoryEditForm = useForm<AddCategoryFormInputs>({
-    resolver: zodResolver(AddCategoryFormInputs),
+  const categoryEditForm = useForm<CategoryFormInputs>({ // Use CategoryFormInputs type
+    resolver: zodResolver(categoryFormSchema), // Use imported categoryFormSchema object
   });
 
   const videoEditForm = useForm<VideoFormInputs>({
@@ -142,7 +142,7 @@ export function ManageVideosClient() {
     }
   };
 
-  const handleCategoryUpdate = async (data: AddCategoryFormInputs) => {
+  const handleCategoryUpdate = async (data: CategoryFormInputs) => {
     if (!editingCategory) return;
     setIsLoading(true);
     const oldCategory = categories.find(c => c.id === editingCategory.id);
