@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
 import { VideoPlayer } from '@/components/videos/VideoPlayer';
 import { VideoPlaylist } from '@/components/videos/VideoPlaylist';
-import { CATEGORIES, SAMPLE_PLAYLIST_DATA, type PlaylistData } from '@/lib/constants';
+import { CATEGORIES, SAMPLE_PLAYLIST_DATA, type PlaylistData, getCategories, getPlaylistData } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -15,14 +15,19 @@ function VideosPageContent() {
   const searchParams = useSearchParams();
   const initialTabFromQuery = searchParams.get('tab');
 
+  // Fetch categories and playlists dynamically
+  const [dynamicCategories, setDynamicCategories] = useState(() => getCategories());
+  const [dynamicPlaylists, setDynamicPlaylists] = useState(() => getPlaylistData());
+
+
   const [activeCategory, setActiveCategory] = useState<string>(() => {
-    const isValidTab = CATEGORIES.some(c => c.id === initialTabFromQuery);
-    return isValidTab && initialTabFromQuery ? initialTabFromQuery : CATEGORIES[0].id;
+    const isValidTab = dynamicCategories.some(c => c.id === initialTabFromQuery);
+    return isValidTab && initialTabFromQuery ? initialTabFromQuery : (dynamicCategories.length > 0 ? dynamicCategories[0].id : "");
   });
   
   const currentPlaylist: PlaylistData | undefined = useMemo(() => {
-    return SAMPLE_PLAYLIST_DATA[activeCategory];
-  }, [activeCategory]);
+    return dynamicPlaylists[activeCategory];
+  }, [activeCategory, dynamicPlaylists]);
 
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
 
@@ -31,29 +36,37 @@ function VideosPageContent() {
   const videoInfoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const newPlaylist = SAMPLE_PLAYLIST_DATA[activeCategory];
+    // Update categories and playlists if they change (e.g., after admin updates)
+    // For this demo, this will re-fetch from the module-level exports
+    setDynamicCategories(getCategories());
+    setDynamicPlaylists(getPlaylistData());
+  }, []); // Could add a dependency if there was a global state update mechanism
+
+  useEffect(() => {
+    const newPlaylist = dynamicPlaylists[activeCategory];
     setCurrentVideoId(newPlaylist?.videos[0]?.id || null);
-  }, [activeCategory]);
+  }, [activeCategory, dynamicPlaylists]);
 
   useEffect(() => {
     const tabFromQuery = searchParams.get('tab');
-    const isValidTab = CATEGORIES.some(c => c.id === tabFromQuery);
+    const isValidTab = dynamicCategories.some(c => c.id === tabFromQuery);
     if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
       setActiveCategory(tabFromQuery);
+    } else if (!isValidTab && initialTabFromQuery && dynamicCategories.length > 0) {
+      // If query tab is invalid, default to first available category
+      setActiveCategory(dynamicCategories[0].id);
     }
-  }, [searchParams, activeCategory]);
+  }, [searchParams, activeCategory, dynamicCategories, initialTabFromQuery]);
   
   useEffect(() => {
-    // Dynamically set CSS variables for sticky calculations
     const root = document.documentElement;
-    const headerHeight = document.querySelector('header')?.offsetHeight || 64; // Fallback header height
+    const headerHeight = document.querySelector('header')?.offsetHeight || 64; 
     root.style.setProperty('--header-height', `${headerHeight}px`);
 
     if (tabsRef.current) {
       root.style.setProperty('--tabs-height', `${tabsRef.current.offsetHeight}px`);
     }
     if (videoPlayerRef.current) {
-       // Calculate aspect ratio height for video player (16:9)
       const playerWidth = videoPlayerRef.current.offsetWidth;
       const playerHeight = (playerWidth * 9) / 16;
       root.style.setProperty('--video-player-aspect-ratio-height', `${playerHeight}px`);
@@ -62,7 +75,7 @@ function VideosPageContent() {
       root.style.setProperty('--video-info-height', `${videoInfoRef.current.offsetHeight}px`);
     }
 
-  }, [activeCategory, currentVideoId]); // Re-calculate if these change, as layout might shift
+  }, [activeCategory, currentVideoId]);
 
 
   const handleTabChange = (tabId: string) => {
@@ -77,16 +90,26 @@ function VideosPageContent() {
     return currentPlaylist?.videos.find(v => v.id === currentVideoId);
   }, [currentPlaylist, currentVideoId]);
 
+  if (dynamicCategories.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-muted-foreground">No video categories available. Content might be managed by an administrator.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-0 md:space-y-4 lg:space-y-6">
       <div ref={tabsRef} className="sticky top-[var(--header-height,64px)] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:pt-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm mb-4 md:mb-0">
-        <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange} />
+        <TabNavigation tabs={dynamicCategories} defaultTab={activeCategory} onTabChange={handleTabChange} />
       </div>
       
       {(!currentPlaylist || currentPlaylist.videos.length === 0) ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground">No videos available for {CATEGORIES.find(c => c.id === activeCategory)?.label || 'this category'} yet. Stay tuned!</p>
+            <p className="text-muted-foreground">No videos available for {dynamicCategories.find(c => c.id === activeCategory)?.label || 'this category'} yet. Stay tuned!</p>
           </CardContent>
         </Card>
       ) : (

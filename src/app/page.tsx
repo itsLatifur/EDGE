@@ -19,6 +19,8 @@ interface RoadmapStep {
   buttonClass: string;
 }
 
+// This data can also be made dynamic or fetched if it needs to be admin-managed in the future.
+// For now, it's static as per original design.
 const roadmapSteps: RoadmapStep[] = [
   {
     id: 'html',
@@ -61,7 +63,7 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'Responsive Web Design',
     description: 'Ensure your websites look great on all devices. Learn about media queries, fluid layouts, and mobile-first strategies.',
     icon: Smartphone,
-    learnMoreLink: '/resources',
+    learnMoreLink: '/resources', // Link to general resources or a specific responsive design tab if created by admin
     iconBgClass: 'bg-green-100 dark:bg-green-900/40',
     iconColorClass: 'text-green-600 dark:text-green-400',
     cardBorderClass: 'border-green-500 dark:border-green-600',
@@ -73,7 +75,7 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'Version Control with Git',
     description: 'Track changes, collaborate with others, and manage your codebase effectively using Git and platforms like GitHub.',
     icon: GitMerge,
-    learnMoreLink: '/resources',
+    learnMoreLink: '/resources', // Link to general resources or a specific Git tab if created by admin
     iconBgClass: 'bg-purple-100 dark:bg-purple-900/40',
     iconColorClass: 'text-purple-600 dark:text-purple-400',
     cardBorderClass: 'border-purple-500 dark:border-purple-600',
@@ -85,7 +87,7 @@ const roadmapSteps: RoadmapStep[] = [
     title: 'Intro to Frontend Frameworks',
     description: 'Explore powerful tools like React (and Next.js by extension) to build complex, scalable, and interactive user interfaces.',
     icon: Component,
-    learnMoreLink: '/videos',
+    learnMoreLink: '/videos', // Link to general videos or a specific frameworks tab if created by admin
     iconBgClass: 'bg-teal-100 dark:bg-teal-900/40',
     iconColorClass: 'text-teal-600 dark:text-teal-400',
     cardBorderClass: 'border-teal-500 dark:border-teal-600',
@@ -156,6 +158,9 @@ export default function HomePage() {
         <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto">
           Navigate your path to becoming a frontend developer. Each step builds on the last, guiding you from fundamentals to more advanced topics.
         </p>
+         <p className="text-sm text-muted-foreground max-w-3xl mx-auto mt-2">
+          Content for Videos and Resources pages is dynamically updated and can be managed via the <Link href="/developer" className="text-primary hover:underline">Developer Panel</Link>.
+        </p>
       </header>
 
       <div className="relative mt-8 md:mt-12">
@@ -165,13 +170,7 @@ export default function HomePage() {
           <RoadmapStepCard key={step.id} step={step} index={index} totalSteps={roadmapSteps.length} />
         ))}
       </div>
-
-      {/* Footer removed as it's now part of RootLayout */}
-      {/* <footer className="text-center mt-16 md:mt-24 pt-8 border-t">
-        <p className="text-muted-foreground">
-          Ready to dive in? Explore our <Link href="/videos" className="font-medium text-primary hover:underline">Video Playlists</Link> and <Link href="/resources" className="font-medium text-primary hover:underline">Curated Resources</Link>.
-        </p>
-      </footer> */}
     </div>
   );
 }
+

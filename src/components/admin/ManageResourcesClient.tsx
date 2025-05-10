@@ -1,0 +1,252 @@
+// src/components/admin/ManageResourcesClient.tsx
+"use client";
+
+import { useState, useEffect } from 'react';
+import { useForm, type SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { PlusCircle, BookOpen as BookOpenIcon, Loader2 } from 'lucide-react';
+import type { CategoryTab, ResourceLink } from '@/lib/constants';
+import { addCategory as addCategoryToMemory, addResourceLink as addResourceLinkToMemory, getCategories, getResourcesData, LUCIDE_ICON_MAP } from '@/lib/constants';
+import { AddCategoryForm } from './AddCategoryForm';
+
+const resourceLinkTypes = ['documentation', 'article', 'tool', 'guide'] as const;
+
+const resourceSchema = z.object({
+  categoryId: z.string().min(1, { message: "Please select a category" }),
+  title: z.string().min(3, { message: "Resource title is required" }),
+  url: z.string().url({ message: "A valid URL is required" }),
+  description: z.string().min(10, { message: "Description must be at least 10 characters" }),
+  type: z.enum(resourceLinkTypes, { errorMap: () => ({ message: "Please select a resource type"}) }),
+});
+
+type ResourceFormInputs = z.infer<typeof resourceSchema>;
+
+export function ManageResourcesClient() {
+  const { toast } = useToast();
+  const [categories, setCategories] = useState<CategoryTab[]>([]);
+  const [resources, setResources] = useState<Record<string, ResourceLink[]>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCategoryLoading, setIsCategoryLoading] = useState(true);
+
+  useEffect(() => {
+    setCategories(getCategories());
+    setResources(getResourcesData());
+    setIsCategoryLoading(false);
+  }, []);
+
+  const form = useForm<ResourceFormInputs>({
+    resolver: zodResolver(resourceSchema),
+    defaultValues: {
+      categoryId: "",
+      title: "",
+      url: "",
+      description: "",
+      type: undefined,
+    },
+  });
+
+  const handleCategoryAdded = (newCategory: CategoryTab) => {
+    addCategoryToMemory({ id: newCategory.id, label: newCategory.label, iconName: 'PlusCircle' });
+    setCategories(getCategories());
+    setResources(getResourcesData());
+    toast({ title: "Category Added", description: `"${newCategory.label}" is now available for adding resources.` });
+  };
+
+  const onResourceSubmit: SubmitHandler<ResourceFormInputs> = async (data) => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API
+
+    const newResource: ResourceLink = {
+      id: `${data.categoryId}-${data.title.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`, // Simple unique ID
+      title: data.title,
+      url: data.url,
+      description: data.description,
+      type: data.type,
+    };
+    
+    const success = addResourceLinkToMemory(data.categoryId, newResource);
+
+    if (success) {
+      setResources(getResourcesData());
+      toast({ title: "Resource Added", description: `"${data.title}" added to category "${categories.find(c=>c.id === data.categoryId)?.label}".` });
+      form.reset({ categoryId: data.categoryId, title: "", url: "", description: "", type: undefined });
+    } else {
+      toast({ title: "Error", description: "Failed to add resource. Category might not exist.", variant: "destructive" });
+    }
+    setIsLoading(false);
+  };
+
+  return (
+    <div className="space-y-8">
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center"><PlusCircle className="mr-2 h-6 w-6 text-primary" /> Add New Resource Category</CardTitle>
+          <CardDescription>Create a new category (tab) for organizing resources. This will appear on the public "Resources" page.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AddCategoryForm onCategoryAdded={handleCategoryAdded} existingCategories={categories} />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center"><BookOpenIcon className="mr-2 h-6 w-6 text-primary" /> Add New Resource Link</CardTitle>
+          <CardDescription>Select a category and add a new resource link (article, tool, etc.).</CardDescription>
+        </CardHeader>
+        <CardContent>
+           {isCategoryLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Loading categories...</p>
+            </div>
+          ) : categories.length === 0 ? (
+             <p className="text-muted-foreground">No categories available. Please add a category first.</p>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onResourceSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="categoryId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map(category => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Resource Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., MDN Web Docs for HTML" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>URL</FormLabel>
+                      <FormControl>
+                        <Input type="url" placeholder="https://developer.mozilla.org/" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="A short description of the resource." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Resource Type</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select resource type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {resourceLinkTypes.map(type => (
+                            <SelectItem key={type} value={type} className="capitalize">
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                  Add Resource
+                </Button>
+              </form>
+            </Form>
+          )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card className="shadow-md">
+        <CardHeader>
+            <CardTitle className="text-2xl">Current Resources</CardTitle>
+            <CardDescription>Overview of resources in each category.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {isCategoryLoading ? (
+                <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="ml-2">Loading resources...</p>
+                </div>
+            ) : categories.length === 0 ? (
+                <p className="text-muted-foreground">No categories available to display resources.</p>
+            ) : (
+                <div className="space-y-4">
+                    {categories.map(category => (
+                        <div key={category.id}>
+                            <h3 className="text-lg font-semibold mb-2">{category.label} ({resources[category.id]?.length || 0} resources)</h3>
+                            {resources[category.id] && resources[category.id].length > 0 ? (
+                                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                    {resources[category.id].map(resource => (
+                                        <li key={resource.id} className="truncate" title={resource.title}>{resource.title} ({resource.type})</li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No resources in this category yet.</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

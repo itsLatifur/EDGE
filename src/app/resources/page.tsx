@@ -4,7 +4,7 @@
 import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TabNavigation } from '@/components/shared/TabNavigation';
-import { CATEGORIES, SAMPLE_RESOURCES_DATA, type ResourceLink } from '@/lib/constants';
+import { CATEGORIES, SAMPLE_RESOURCES_DATA, type ResourceLink, getCategories, getResourcesData } from '@/lib/constants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExternalLink } from 'lucide-react';
@@ -16,18 +16,30 @@ function ResourcesPageContent() {
   const initialTabFromQuery = searchParams.get('tab');
   const tabsRef = useRef<HTMLDivElement>(null);
 
+  // Fetch categories and resources dynamically
+  const [dynamicCategories, setDynamicCategories] = useState(() => getCategories());
+  const [dynamicResources, setDynamicResources] = useState(() => getResourcesData());
+
   const [activeCategory, setActiveCategory] = useState<string>(() => {
-    const isValidTab = CATEGORIES.some(c => c.id === initialTabFromQuery);
-    return isValidTab && initialTabFromQuery ? initialTabFromQuery : CATEGORIES[0].id;
+    const isValidTab = dynamicCategories.some(c => c.id === initialTabFromQuery);
+    return isValidTab && initialTabFromQuery ? initialTabFromQuery : (dynamicCategories.length > 0 ? dynamicCategories[0].id : "");
   });
 
   useEffect(() => {
+    // Update categories and resources if they change
+    setDynamicCategories(getCategories());
+    setDynamicResources(getResourcesData());
+  }, []);
+
+  useEffect(() => {
     const tabFromQuery = searchParams.get('tab');
-    const isValidTab = CATEGORIES.some(c => c.id === tabFromQuery);
+    const isValidTab = dynamicCategories.some(c => c.id === tabFromQuery);
     if (isValidTab && tabFromQuery && tabFromQuery !== activeCategory) {
       setActiveCategory(tabFromQuery);
+    } else if (!isValidTab && initialTabFromQuery && dynamicCategories.length > 0) {
+      setActiveCategory(dynamicCategories[0].id);
     }
-  }, [searchParams, activeCategory]);
+  }, [searchParams, activeCategory, dynamicCategories, initialTabFromQuery]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -41,10 +53,19 @@ function ResourcesPageContent() {
 
   const handleTabChange = (tabId: string) => {
     setActiveCategory(tabId);
-    // Optionally update URL: window.history.pushState(null, '', `?tab=${tabId}`);
   };
   
-  const currentCategoryLabel = CATEGORIES.find(c => c.id === activeCategory)?.label || 'Resources';
+  const currentCategoryLabel = dynamicCategories.find(c => c.id === activeCategory)?.label || 'Resources';
+
+  if (dynamicCategories.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-muted-foreground">No resource categories available. Content might be managed by an administrator.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-0 md:space-y-4 lg:space-y-6">
@@ -56,24 +77,23 @@ function ResourcesPageContent() {
       </header>
 
       <div ref={tabsRef} className="sticky top-[var(--header-height,64px)] z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:pt-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 md:shadow-none shadow-sm mb-4 md:mb-0">
-         <TabNavigation tabs={CATEGORIES} defaultTab={activeCategory} onTabChange={handleTabChange} />
+         <TabNavigation tabs={dynamicCategories} defaultTab={activeCategory} onTabChange={handleTabChange} />
       </div>
       
-      {/* Content for the active tab */}
       {(() => {
-          const resources = SAMPLE_RESOURCES_DATA[activeCategory];
-          if (!resources || resources.length === 0) {
+          const resourcesForActiveCategory = dynamicResources[activeCategory];
+          if (!resourcesForActiveCategory || resourcesForActiveCategory.length === 0) {
             return (
               <Card className="mt-6">
                 <CardContent className="pt-6">
-                  <p className="text-muted-foreground">No resources available for {CATEGORIES.find(c => c.id === activeCategory)?.label || 'this category'} yet. Check back soon!</p>
+                  <p className="text-muted-foreground">No resources available for {dynamicCategories.find(c => c.id === activeCategory)?.label || 'this category'} yet. Check back soon!</p>
                 </CardContent>
               </Card>
             );
           }
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-              {resources.map((resource: ResourceLink) => (
+              {resourcesForActiveCategory.map((resource: ResourceLink) => (
                 <Card key={resource.id} className="flex flex-col shadow-xl hover:shadow-2xl transition-all duration-300 ease-in-out transform hover:-translate-y-1">
                   <CardHeader>
                     <CardTitle className="text-xl">{resource.title}</CardTitle>
@@ -133,3 +153,4 @@ function ResourcesPageSkeleton() {
     </div>
   );
 }
+

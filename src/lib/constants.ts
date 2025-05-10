@@ -1,11 +1,12 @@
 // src/lib/constants.ts
 import type { LucideIcon } from 'lucide-react';
-import { CodeXml, Palette, Braces } from 'lucide-react';
+import { CodeXml, Palette, Braces, Settings, Video, BookOpen, PlusCircle } from 'lucide-react';
 
 export const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/videos", label: "Videos" },
   { href: "/resources", label: "Resources" },
+  { href: "/developer", label: "Developer" }, // Added Developer link
 ];
 
 export interface CategoryTab {
@@ -14,7 +15,8 @@ export interface CategoryTab {
   icon: LucideIcon;
 }
 
-export const CATEGORIES: CategoryTab[] = [
+// Initial categories, admin panel will be able to add more (in-memory for this demo)
+export let CATEGORIES: CategoryTab[] = [
   { id: "html", label: "HTML", icon: CodeXml },
   { id: "css", label: "CSS", icon: Palette },
   { id: "javascript", label: "JavaScript", icon: Braces },
@@ -34,7 +36,8 @@ export interface PlaylistData {
 
 const placeholderBase = "https://picsum.photos/seed";
 
-export const SAMPLE_PLAYLIST_DATA: Record<string, PlaylistData> = {
+// Initial video data, admin panel will be able to add more (in-memory for this demo)
+export let SAMPLE_PLAYLIST_DATA: Record<string, PlaylistData> = {
   html: {
     playlistId: "PL4cUxeGkcC9ivBf_eKCPIAYXWzLlPA72V",
     name: "HTML Essentials",
@@ -62,7 +65,7 @@ export const SAMPLE_PLAYLIST_DATA: Record<string, PlaylistData> = {
       { id: "W6NZfCO5SIk", title: "JavaScript Tutorial for Beginners", thumbnailUrl: `${placeholderBase}/js1/160/90` },
       { id: "jS4aFq5-91M", title: "Learn JavaScript - Full Course for Beginners", thumbnailUrl: `${placeholderBase}/js2/160/90` },
       { id: "PkZNo7MFNFg", title: "JavaScript Crash Course For Beginners", thumbnailUrl: `${placeholderBase}/js3/160/90` },
-      { id: "htznMG rebord", title: "Modern JavaScript Tutorial", thumbnailUrl: `${placeholderBase}/js4/160/90` }, // Note: "rebord" might be a typo in original id, kept as is.
+      { id: "htznMG rebord", title: "Modern JavaScript Tutorial", thumbnailUrl: `${placeholderBase}/js4/160/90` },
     ],
   },
 };
@@ -75,7 +78,8 @@ export interface ResourceLink {
   type: 'documentation' | 'article' | 'tool' | 'guide';
 }
 
-export const SAMPLE_RESOURCES_DATA: Record<string, ResourceLink[]> = {
+// Initial resource data, admin panel will be able to add more (in-memory for this demo)
+export let SAMPLE_RESOURCES_DATA: Record<string, ResourceLink[]> = {
   html: [
     { id: 'html-mdn', title: 'MDN Web Docs: HTML', url: 'https://developer.mozilla.org/en-US/docs/Web/HTML', description: 'Comprehensive HTML documentation by Mozilla.', type: 'documentation' },
     { id: 'html-w3schools', title: 'W3Schools HTML Tutorial', url: 'https://www.w3schools.com/html/', description: 'Interactive HTML tutorials and references.', type: 'guide' },
@@ -92,3 +96,58 @@ export const SAMPLE_RESOURCES_DATA: Record<string, ResourceLink[]> = {
     { id: 'js-info', title: 'The Modern JavaScript Tutorial', url: 'https://javascript.info/', description: 'From basic to advanced topics with simple, but detailed explanations.', type: 'guide' },
   ],
 };
+
+// In-memory data management functions for demo
+// These would be replaced by API calls in a real application
+
+export const getCategories = (): CategoryTab[] => [...CATEGORIES];
+export const getPlaylistData = (): Record<string, PlaylistData> => JSON.parse(JSON.stringify(SAMPLE_PLAYLIST_DATA));
+export const getResourcesData = (): Record<string, ResourceLink[]> => JSON.parse(JSON.stringify(SAMPLE_RESOURCES_DATA));
+
+export const addCategory = (newCategory: { id: string; label: string; iconName: keyof typeof LUCIDE_ICON_MAP }): CategoryTab | null => {
+  if (CATEGORIES.find(cat => cat.id === newCategory.id || cat.label.toLowerCase() === newCategory.label.toLowerCase())) {
+    console.warn("Category already exists");
+    return null;
+  }
+  const IconComponent = LUCIDE_ICON_MAP[newCategory.iconName] || PlusCircle;
+  const addedCategory = { id: newCategory.id, label: newCategory.label, icon: IconComponent };
+  CATEGORIES.push(addedCategory);
+  // Initialize empty arrays for new category in video and resource data
+  if (!SAMPLE_PLAYLIST_DATA[newCategory.id]) {
+    SAMPLE_PLAYLIST_DATA[newCategory.id] = { playlistId: `custom-${newCategory.id}`, name: `${newCategory.label} Videos`, videos: [] };
+  }
+  if (!SAMPLE_RESOURCES_DATA[newCategory.id]) {
+    SAMPLE_RESOURCES_DATA[newCategory.id] = [];
+  }
+  return addedCategory;
+};
+
+export const addVideoToPlaylist = (categoryId: string, video: VideoItem): boolean => {
+  if (SAMPLE_PLAYLIST_DATA[categoryId]) {
+    SAMPLE_PLAYLIST_DATA[categoryId].videos.push(video);
+    return true;
+  }
+  return false;
+};
+
+export const addResourceLink = (categoryId: string, resource: ResourceLink): boolean => {
+  if (SAMPLE_RESOURCES_DATA[categoryId]) {
+    SAMPLE_RESOURCES_DATA[categoryId].push(resource);
+    return true;
+  }
+  return false;
+};
+
+// Map icon names to Lucide components for dynamic icon selection
+export const LUCIDE_ICON_MAP = {
+  CodeXml,
+  Palette,
+  Braces,
+  Settings,
+  Video,
+  BookOpen,
+  PlusCircle,
+  // Add more icons here as needed for new categories
+};
+
+export const AVAILABLE_ICONS_FOR_TABS = Object.keys(LUCIDE_ICON_MAP) as (keyof typeof LUCIDE_ICON_MAP)[];
