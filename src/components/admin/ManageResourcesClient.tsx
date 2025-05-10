@@ -40,7 +40,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { ToastAction } from '@/components/ui/toast';
 
 
@@ -57,7 +57,7 @@ type ResourceFormInputs = z.infer<typeof resourceSchema>;
 type LastAction = 
   | { type: 'add-category', data: CategoryTab }
   | { type: 'update-category', oldData: CategoryTab, newData: CategoryTab }
-  | { type: 'delete-category', data: CategoryTab & { associatedResources: ResourceLink[] } } // also store associated resources
+  | { type: 'delete-category', data: CategoryTab & { associatedResources: ResourceLink[] } } 
   | { type: 'add-resource', data: ResourceLink, categoryId: string }
   | { type: 'update-resource', oldData: ResourceLink, newData: ResourceLink, categoryId: string }
   | { type: 'delete-resource', data: ResourceLink, categoryId: string };
@@ -75,9 +75,12 @@ export function ManageResourcesClient() {
   const [lastAction, setLastAction] = useState<LastAction | null>(null);
   const [lastToastId, setLastToastId] = useState<string | null>(null);
 
+  const [isEditCategoryDialogOpen, setIsEditCategoryDialogOpen] = useState(false);
+  const [isEditResourceDialogOpen, setIsEditResourceDialogOpen] = useState(false);
 
-  const categoryEditForm = useForm<CategoryFormInputs>({ // Use CategoryFormInputs type
-    resolver: zodResolver(categoryFormSchema), // Use imported categoryFormSchema object
+
+  const categoryEditForm = useForm<CategoryFormInputs>({ 
+    resolver: zodResolver(categoryFormSchema), 
   });
 
   const resourceEditForm = useForm<ResourceFormInputs>({
@@ -97,7 +100,7 @@ export function ManageResourcesClient() {
 
   const showUndoToast = (title: string, description: string, undoAction: () => void) => {
     if (lastToastId) {
-      dismiss(lastToastId); // Dismiss previous undo toast if any
+      dismiss(lastToastId); 
     }
     const newToast = toast({
       title,
@@ -157,9 +160,9 @@ export function ManageResourcesClient() {
       setLastAction({ type: 'update-category', oldData: oldCategory, newData: updatedCategory });
       refreshData();
       setEditingCategory(null);
+      setIsEditCategoryDialogOpen(false);
       showUndoToast("Category Updated", `"${updatedCategory.label}" updated.`, handleUndo);
       categoryEditForm.reset();
-      document.getElementById('edit-category-dialog-close')?.click();
     } else {
       toast({ title: "Error", description: "Failed to update category. Label might conflict.", variant: "destructive" });
     }
@@ -168,6 +171,7 @@ export function ManageResourcesClient() {
   const openEditCategoryDialog = (category: CategoryTab) => {
     setEditingCategory(category);
     categoryEditForm.reset({ id: category.id, label: category.label, iconName: category.iconName });
+    setIsEditCategoryDialogOpen(true);
   };
 
   const handleDeleteCategory = (categoryId: string) => {
@@ -221,9 +225,9 @@ export function ManageResourcesClient() {
       setLastAction({ type: 'update-resource', oldData: oldResource, newData: updatedResource, categoryId: editingResource.categoryId });
       refreshData();
       setEditingResource(null);
+      setIsEditResourceDialogOpen(false);
       showUndoToast("Resource Updated", `"${updatedResource.title}" updated.`, handleUndo);
       resourceEditForm.reset();
-      document.getElementById('edit-resource-dialog-close')?.click();
     } else {
       toast({ title: "Error", description: "Failed to update resource. URL might conflict.", variant: "destructive" });
     }
@@ -238,6 +242,7 @@ export function ManageResourcesClient() {
       description: resource.description,
       type: resource.type,
     });
+    setIsEditResourceDialogOpen(true);
   };
 
   const handleDeleteResource = (categoryId: string, resourceId: string) => {
@@ -381,7 +386,10 @@ export function ManageResourcesClient() {
       <Separator />
 
       {/* Edit Category Dialog */}
-      <Dialog onOpenChange={(open) => !open && setEditingCategory(null)}>
+      <Dialog open={isEditCategoryDialogOpen} onOpenChange={(open) => {
+        setIsEditCategoryDialogOpen(open);
+        if (!open) setEditingCategory(null);
+      }}>
         <DialogContent className="sm:max-w-md" id="edit-category-dialog">
           <DialogHeader>
             <DialogTitle>Edit Category</DialogTitle>
@@ -389,7 +397,6 @@ export function ManageResourcesClient() {
           {editingCategory && (
             <Form {...categoryEditForm}>
               <form onSubmit={categoryEditForm.handleSubmit(handleCategoryUpdate)} className="space-y-4 pt-2">
-                {/* Hidden ID field as it shouldn't be editable */}
                 <input type="hidden" {...categoryEditForm.register("id")} />
                 <FormField
                   control={categoryEditForm.control}
@@ -432,7 +439,10 @@ export function ManageResourcesClient() {
       </Dialog>
 
       {/* Edit Resource Dialog */}
-       <Dialog onOpenChange={(open) => !open && setEditingResource(null)}>
+       <Dialog open={isEditResourceDialogOpen} onOpenChange={(open) => {
+         setIsEditResourceDialogOpen(open);
+         if (!open) setEditingResource(null);
+       }}>
         <DialogContent className="sm:max-w-lg" id="edit-resource-dialog">
           <DialogHeader>
             <DialogTitle>Edit Resource</DialogTitle>
@@ -496,11 +506,9 @@ export function ManageResourcesClient() {
                                   {category.label} ({resources[category.id]?.length || 0} resources)
                                 </h3>
                                 <div className="space-x-2">
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" onClick={() => openEditCategoryDialog(category)}>
-                                            <Edit3 className="h-3.5 w-3.5" /> <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
-                                        </Button>
-                                    </DialogTrigger>
+                                    <Button variant="outline" size="sm" onClick={() => openEditCategoryDialog(category)}>
+                                        <Edit3 className="h-3.5 w-3.5" /> <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
+                                    </Button>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="destructive" size="sm">
@@ -525,11 +533,9 @@ export function ManageResourcesClient() {
                                                 </span>
                                             </div>
                                             <div className="space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <DialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditResourceDialog(resource, category.id)}>
-                                                        <Edit3 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </DialogTrigger>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditResourceDialog(resource, category.id)}>
+                                                    <Edit3 className="h-3.5 w-3.5" />
+                                                </Button>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive">

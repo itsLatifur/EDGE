@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { ToastAction } from '@/components/ui/toast';
 import Image from 'next/image';
 
@@ -72,8 +72,11 @@ export function ManageVideosClient() {
   const [lastAction, setLastAction] = useState<LastAction | null>(null);
   const [lastToastId, setLastToastId] = useState<string | null>(null);
 
-  const categoryEditForm = useForm<CategoryFormInputs>({ // Use CategoryFormInputs type
-    resolver: zodResolver(categoryFormSchema), // Use imported categoryFormSchema object
+  const [isEditCategoryDialogOpen, setIsEditCategoryDialogOpen] = useState(false);
+  const [isEditVideoDialogOpen, setIsEditVideoDialogOpen] = useState(false);
+
+  const categoryEditForm = useForm<CategoryFormInputs>({ 
+    resolver: zodResolver(categoryFormSchema), 
   });
 
   const videoEditForm = useForm<VideoFormInputs>({
@@ -115,7 +118,7 @@ export function ManageVideosClient() {
     if (lastAction.type === 'add-category') {
       deleteCategoryInMemory(lastAction.data.id);
     } else if (lastAction.type === 'delete-category') {
-      addCategoryInMemory(lastAction.data); // This uses iconName
+      addCategoryInMemory(lastAction.data); 
       lastAction.data.associatedVideos.forEach(vid => addVideoToMemoryPlaylist(lastAction.data.id, vid));
     } else if (lastAction.type === 'update-category') {
       updateCategoryInMemory(lastAction.oldData.id, lastAction.oldData);
@@ -152,9 +155,9 @@ export function ManageVideosClient() {
       setLastAction({ type: 'update-category', oldData: oldCategory, newData: updatedCategory });
       refreshData();
       setEditingCategory(null);
+      setIsEditCategoryDialogOpen(false);
       showUndoToast("Category Updated", `"${updatedCategory.label}" updated.`, handleUndo);
       categoryEditForm.reset();
-      document.getElementById('edit-video-category-dialog-close')?.click();
     } else {
       toast({ title: "Error", description: "Failed to update category. Label might conflict.", variant: "destructive" });
     }
@@ -163,6 +166,7 @@ export function ManageVideosClient() {
   const openEditCategoryDialog = (category: CategoryTab) => {
     setEditingCategory(category);
     categoryEditForm.reset({ id: category.id, label: category.label, iconName: category.iconName });
+    setIsEditCategoryDialogOpen(true);
   };
 
   const handleDeleteCategory = (categoryId: string) => {
@@ -209,16 +213,15 @@ export function ManageVideosClient() {
         title: data.title,
         thumbnailUrl: data.thumbnailUrl || `https://i.ytimg.com/vi/${data.videoId}/hqdefault.jpg`,
     };
-    // Note: We don't update videoId itself here as it's the primary key. If ID needs change, it's a delete then add.
     const updatedVideo = updateVideoInMemory(editingVideo.categoryId, editingVideo.video.id, videoDataToUpdate);
     setIsLoading(false);
     if (updatedVideo && oldVideo) {
       setLastAction({ type: 'update-video', oldData: oldVideo, newData: updatedVideo, categoryId: editingVideo.categoryId });
       refreshData();
       setEditingVideo(null);
+      setIsEditVideoDialogOpen(false);
       showUndoToast("Video Updated", `"${updatedVideo.title}" updated.`, handleUndo);
       videoEditForm.reset();
-      document.getElementById('edit-video-dialog-close')?.click();
     } else {
       toast({ title: "Error", description: "Failed to update video.", variant: "destructive" });
     }
@@ -228,10 +231,11 @@ export function ManageVideosClient() {
     setEditingVideo({ video, categoryId });
     videoEditForm.reset({
       categoryId: categoryId,
-      videoId: video.id, // videoId is not editable in this form, used for submission
+      videoId: video.id, 
       title: video.title,
       thumbnailUrl: video.thumbnailUrl,
     });
+    setIsEditVideoDialogOpen(true);
   };
 
   const handleDeleteVideo = (categoryId: string, videoId: string) => {
@@ -288,7 +292,10 @@ export function ManageVideosClient() {
       <Separator />
 
       {/* Edit Category Dialog */}
-      <Dialog onOpenChange={(open) => !open && setEditingCategory(null)}>
+      <Dialog open={isEditCategoryDialogOpen} onOpenChange={(open) => {
+        setIsEditCategoryDialogOpen(open);
+        if (!open) setEditingCategory(null);
+      }}>
         <DialogContent className="sm:max-w-md" id="edit-video-category-dialog">
           <DialogHeader><DialogTitle>Edit Video Category</DialogTitle></DialogHeader>
           {editingCategory && (
@@ -297,7 +304,10 @@ export function ManageVideosClient() {
                 <input type="hidden" {...categoryEditForm.register("id")} />
                 <FormField control={categoryEditForm.control} name="label" render={({ field }) => (<FormItem><FormLabel>Label</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={categoryEditForm.control} name="iconName" render={({ field }) => (<FormItem><FormLabel>Icon</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{AVAILABLE_ICONS_FOR_TABS.map(iconNameKey => { const IconC = LUCIDE_ICON_MAP[iconNameKey]; return (<SelectItem key={iconNameKey} value={iconNameKey}><div className="flex items-center"><IconC className="mr-2 h-4 w-4" />{iconNameKey}</div></SelectItem>);})}</SelectContent></Select><FormMessage /></FormItem>)} />
-                <div className="flex justify-end space-x-2"><DialogClose asChild><Button type="button" variant="outline" id="edit-video-category-dialog-close">Cancel</Button></DialogClose><Button type="submit" disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin" /> : "Save"}</Button></div>
+                <div className="flex justify-end space-x-2">
+                  <DialogClose asChild><Button type="button" variant="outline" id="edit-video-category-dialog-close">Cancel</Button></DialogClose>
+                  <Button type="submit" disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin" /> : "Save"}</Button>
+                </div>
               </form>
             </Form>
           )}
@@ -305,7 +315,10 @@ export function ManageVideosClient() {
       </Dialog>
 
       {/* Edit Video Dialog */}
-      <Dialog onOpenChange={(open) => !open && setEditingVideo(null)}>
+      <Dialog open={isEditVideoDialogOpen} onOpenChange={(open) => {
+        setIsEditVideoDialogOpen(open);
+        if (!open) setEditingVideo(null);
+      }}>
         <DialogContent className="sm:max-w-lg" id="edit-video-dialog">
           <DialogHeader><DialogTitle>Edit Video Details</DialogTitle></DialogHeader>
           {editingVideo && (
@@ -315,7 +328,10 @@ export function ManageVideosClient() {
                 <FormField control={videoEditForm.control} name="videoId" render={({ field }) => (<FormItem><FormLabel>YouTube Video ID (Cannot be changed)</FormLabel><FormControl><Input {...field} readOnly className="bg-muted/50" /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={videoEditForm.control} name="title" render={({ field }) => (<FormItem><FormLabel>Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={videoEditForm.control} name="thumbnailUrl" render={({ field }) => (<FormItem><FormLabel>Thumbnail URL</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <div className="flex justify-end space-x-2"><DialogClose asChild><Button type="button" variant="outline" id="edit-video-dialog-close">Cancel</Button></DialogClose><Button type="submit" disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin" /> : "Save Changes"}</Button></div>
+                <div className="flex justify-end space-x-2">
+                  <DialogClose asChild><Button type="button" variant="outline" id="edit-video-dialog-close">Cancel</Button></DialogClose>
+                  <Button type="submit" disabled={isLoading}>{isLoading ? <Loader2 className="animate-spin" /> : "Save Changes"}</Button>
+                </div>
               </form>
             </Form>
           )}
@@ -344,11 +360,9 @@ export function ManageVideosClient() {
                                   {category.label} ({playlists[category.id]?.videos?.length || 0} videos)
                                 </h3>
                                 <div className="space-x-2">
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" onClick={() => openEditCategoryDialog(category)}>
-                                            <Edit3 className="h-3.5 w-3.5" /> <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
-                                        </Button>
-                                    </DialogTrigger>
+                                    <Button variant="outline" size="sm" onClick={() => openEditCategoryDialog(category)}>
+                                        <Edit3 className="h-3.5 w-3.5" /> <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
+                                    </Button>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button variant="destructive" size="sm">
@@ -375,11 +389,9 @@ export function ManageVideosClient() {
                                                 </span>
                                             </div>
                                             <div className="space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                 <DialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditVideoDialog(video, category.id)}>
-                                                        <Edit3 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                 </DialogTrigger>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditVideoDialog(video, category.id)}>
+                                                    <Edit3 className="h-3.5 w-3.5" />
+                                                </Button>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive">
