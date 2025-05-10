@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Video as VideoIcon, Loader2 } from 'lucide-react';
 import type { CategoryTab, VideoItem, PlaylistData } from '@/lib/constants';
-import { addCategory as addCategoryToMemory, addVideoToPlaylist as addVideoToMemoryPlaylist, getCategories, getPlaylistData, LUCIDE_ICON_MAP } from '@/lib/constants';
+import { addCategory as addCategoryToMemory, addVideoToPlaylist as addVideoToMemoryPlaylist, getCategories, getPlaylistData } from '@/lib/constants';
 import { AddCategoryForm } from './AddCategoryForm';
 
 const videoSchema = z.object({
@@ -51,20 +51,16 @@ export function ManageVideosClient() {
   });
 
   const handleCategoryAdded = (newCategory: CategoryTab) => {
-    // This function updates the state based on the in-memory change
-    // and re-fetches to simulate data update.
-    // In a real app, this would likely involve an API call and state update on success.
-    addCategoryToMemory({ id: newCategory.id, label: newCategory.label, iconName: 'PlusCircle' }); // Assuming default icon for simplicity
+    addCategoryToMemory({ id: newCategory.id, label: newCategory.label, iconName: 'PlusCircle' }); // Assuming default icon
     
-    setCategories(getCategories()); // Re-fetch categories
-    setPlaylists(getPlaylistData()); // Re-fetch playlists to include new empty playlist
+    setCategories(getCategories()); 
+    setPlaylists(getPlaylistData());
 
     toast({ title: "Category Added", description: `"${newCategory.label}" is now available for adding videos.` });
   };
 
   const onVideoSubmit: SubmitHandler<VideoFormInputs> = async (data) => {
     setIsLoading(true);
-    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const newVideo: VideoItem = {
@@ -76,9 +72,9 @@ export function ManageVideosClient() {
     const success = addVideoToMemoryPlaylist(data.categoryId, newVideo);
 
     if (success) {
-      setPlaylists(getPlaylistData()); // Re-fetch playlists
+      setPlaylists(getPlaylistData()); 
       toast({ title: "Video Added", description: `"${data.title}" added to category "${categories.find(c=>c.id === data.categoryId)?.label}".` });
-      form.reset({ categoryId: data.categoryId, videoId: "", title: "", thumbnailUrl: "" }); // Keep category selected
+      form.reset({ categoryId: data.categoryId, videoId: "", title: "", thumbnailUrl: "" }); 
     } else {
       toast({ title: "Error", description: "Failed to add video. Category might not exist.", variant: "destructive" });
     }
@@ -86,11 +82,11 @@ export function ManageVideosClient() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <Card className="shadow-md">
         <CardHeader>
-          <CardTitle className="text-2xl flex items-center"><PlusCircle className="mr-2 h-6 w-6 text-primary" /> Add New Video Category</CardTitle>
-          <CardDescription>Create a new category (tab) for organizing videos. This will appear on the public "Videos" page.</CardDescription>
+          <CardTitle className="text-lg md:text-xl lg:text-2xl flex items-center"><PlusCircle className="mr-2 h-5 w-5 md:h-6 md:w-6 text-primary" /> Add New Video Category</CardTitle>
+          <CardDescription className="text-xs md:text-sm">Create a new category (tab) for organizing videos.</CardDescription>
         </CardHeader>
         <CardContent>
           <AddCategoryForm onCategoryAdded={handleCategoryAdded} existingCategories={categories} />
@@ -101,20 +97,20 @@ export function ManageVideosClient() {
 
       <Card className="shadow-md">
         <CardHeader>
-          <CardTitle className="text-2xl flex items-center"><VideoIcon className="mr-2 h-6 w-6 text-primary" /> Add Video to Playlist</CardTitle>
-          <CardDescription>Select a category and add a new video by providing its YouTube ID and title.</CardDescription>
+          <CardTitle className="text-lg md:text-xl lg:text-2xl flex items-center"><VideoIcon className="mr-2 h-5 w-5 md:h-6 md:w-6 text-primary" /> Add Video to Playlist</CardTitle>
+          <CardDescription className="text-xs md:text-sm">Select a category and add a new video.</CardDescription>
         </CardHeader>
         <CardContent>
           {isCategoryLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="ml-2">Loading categories...</p>
+            <div className="flex items-center justify-center p-6 md:p-8">
+              <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+              <p className="ml-2 text-sm md:text-base">Loading categories...</p>
             </div>
           ) : categories.length === 0 ? (
-             <p className="text-muted-foreground">No categories available. Please add a category first.</p>
+             <p className="text-sm text-muted-foreground">No categories available. Please add a category first.</p>
           ) : (
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onVideoSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onVideoSubmit)} className="space-y-4 md:space-y-6">
                 <FormField
                   control={form.control}
                   name="categoryId"
@@ -178,7 +174,7 @@ export function ManageVideosClient() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
                   Add Video
                 </Button>
@@ -192,30 +188,30 @@ export function ManageVideosClient() {
       
       <Card className="shadow-md">
         <CardHeader>
-            <CardTitle className="text-2xl">Current Video Playlists</CardTitle>
-            <CardDescription>Overview of videos in each category.</CardDescription>
+            <CardTitle className="text-lg md:text-xl lg:text-2xl">Current Video Playlists</CardTitle>
+            <CardDescription className="text-xs md:text-sm">Overview of videos in each category.</CardDescription>
         </CardHeader>
         <CardContent>
             {isCategoryLoading ? (
-                 <div className="flex items-center justify-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="ml-2">Loading playlists...</p>
+                 <div className="flex items-center justify-center p-6 md:p-8">
+                    <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
+                    <p className="ml-2 text-sm md:text-base">Loading playlists...</p>
                 </div>
             ) : categories.length === 0 ? (
-                <p className="text-muted-foreground">No categories available to display playlists.</p>
+                <p className="text-sm text-muted-foreground">No categories available to display playlists.</p>
             ) : (
                 <div className="space-y-4">
                     {categories.map(category => (
                         <div key={category.id}>
-                            <h3 className="text-lg font-semibold mb-2">{category.label} ({playlists[category.id]?.videos?.length || 0} videos)</h3>
+                            <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2">{category.label} ({playlists[category.id]?.videos?.length || 0} videos)</h3>
                             {playlists[category.id]?.videos && playlists[category.id].videos.length > 0 ? (
-                                <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                <ul className="list-disc pl-5 space-y-1 text-xs md:text-sm text-muted-foreground">
                                     {playlists[category.id].videos.map(video => (
                                         <li key={video.id} className="truncate" title={video.title}>{video.title} (ID: {video.id})</li>
                                     ))}
                                 </ul>
                             ) : (
-                                <p className="text-sm text-muted-foreground">No videos in this playlist yet.</p>
+                                <p className="text-xs md:text-sm text-muted-foreground">No videos in this playlist yet.</p>
                             )}
                         </div>
                     ))}

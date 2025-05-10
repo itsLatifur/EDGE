@@ -70,7 +70,7 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
         <FormField
           control={form.control}
           name="label"
@@ -129,7 +129,7 @@ export function AddCategoryForm({ onCategoryAdded, existingCategories }: AddCate
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
           Add Category
         </Button>
