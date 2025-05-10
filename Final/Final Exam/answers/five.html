@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <nav>
+        <a href="one.html">Problem 1</a> |
+        <a href="two.html">Problem 2</a> |
+        <a href="three.html">Problem 3</a> |
+        <a href="four.html">Problem 4</a> |
+        <a href="five.html">Problem 5</a> |
+        <a href="six.html">Problem 6</a> |
+        <a href="seven.html">Problem 7</a> |
+        <a href="eight.html">Problem 8</a> |
+        <a href="nine.html">Problem 9</a>
+    </nav> 
+    <br><br>
+    <h1>Problem 5</h1><br>
+    <div>
+        <p>Your score is: <span id="score">0</span></p>
+        <button id="increase">Increase</button>
+        <button id="decrease">Decrease</button>
+    </div>
+
+    <script>
+        let score = 0;
+        const scoreSpan = document.getElementById('score');
+        const increaseBtn = document.getElementById('increase');
+        const decreaseBtn = document.getElementById('decrease');
+
+        increaseBtn.onclick = function() {
+            score += 5;
+            scoreSpan.textContent = score;
+        };
+
+        decreaseBtn.onclick = function() {
+            score -= 10;
+            scoreSpan.textContent = score;
+        };
+    </script>
+</body>
+</html>

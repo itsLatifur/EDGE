@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>List of 100 Books</title>
+</head>
+<body>
+    <nav>
+        <a href="one.html">Problem 1</a> |
+        <a href="two.html">Problem 2</a> |
+        <a href="three.html">Problem 3</a> |
+        <a href="four.html">Problem 4</a> |
+        <a href="five.html">Problem 5</a> |
+        <a href="six.html">Problem 6</a> |
+        <a href="seven.html">Problem 7</a> |
+        <a href="eight.html">Problem 8</a> |
+        <a href="nine.html">Problem 9</a>
+    </nav> 
+    <br><br>
+    <h1>Problem 8</h1><br>
+    <input type="text" id="searchInput">
+    <button onclick="searchBook()">Search</button>
+    <br><br>
+    <h1>List of 100 Books</h1>
+    <ol id="bookList">
+        <li>To Kill a Mockingbird by Harper Lee</li>
+        <li>1984 by George Orwell</li>
+        <li>Pride and Prejudice by Jane Austen</li>
+        <li>The Great Gatsby by F. Scott Fitzgerald</li>
+        <li>Moby-Dick by Herman Melville</li>
+        <li>War and Peace by Leo Tolstoy</li>
+        <li>The Catcher in the Rye by J.D. Salinger</li>
+        <li>The Lord of the Rings by J.R.R. Tolkien</li>
+        <li>Ulysses by James Joyce</li>
+        <li>Jane Eyre by Charlotte Brontë</li>
+        <li>Crime and Punishment by Fyodor Dostoevsky</li>
+        <li>The Brothers Karamazov by Fyodor Dostoevsky</li>
+        <li>The Adventures of Huckleberry Finn by Mark Twain</li>
+        <li>The Odyssey by Homer</li>
+        <li>Brave New World by Aldous Huxley</li>
+        <li>Wuthering Heights by Emily Brontë</li>
+        <li>Anna Karenina by Leo Tolstoy</li>
+        <li>One Hundred Years of Solitude by Gabriel Garcia Marquez</li>
+        <li>Great Expectations by Charles Dickens</li>
+        <li>The Divine Comedy by Dante Alighieri</li>
+        <li>The Iliad by Homer</li>
+        <li>Don Quixote by Miguel de Cervantes</li>
+        <li>Les Misérables by Victor Hugo</li>
+        <li>The Grapes of Wrath by John Steinbeck</li>
+        <li>Catch-22 by Joseph Heller</li>
+        <li>The Hobbit by J.R.R. Tolkien</li>
+        <li>Fahrenheit 451 by Ray Bradbury</li>
+        <li>Middlemarch by George Eliot</li>
+        <li>Madame Bovary by Gustave Flaubert</li>
+        <li>Slaughterhouse-Five by Kurt Vonnegut</li>
+        <li>Emma by Jane Austen</li>
+        <li>Frankenstein by Mary Shelley</li>
+        <li>Dracula by Bram Stoker</li>
+        <li>The Picture of Dorian Gray by Oscar Wilde</li>
+        <li>A Tale of Two Cities by Charles Dickens</li>
+        <li>Heart of Darkness by Joseph Conrad</li>
+        <li>The Metamorphosis by Franz Kafka</li>
+        <li>The Count of Monte Cristo by Alexandre Dumas</li>
+        <li>David Copperfield by Charles Dickens</li>
+        <li>Sense and Sensibility by Jane Austen</li>
+        <li>Alice's Adventures in Wonderland by Lewis Carroll</li>
+        <li>The Old Man and the Sea by Ernest Hemingway</li>
+        <li>The Sun Also Rises by Ernest Hemingway</li>
+        <li>For Whom the Bell Tolls by Ernest Hemingway</li>
+        <li>The Sound and the Fury by William Faulkner</li>
+        <li>Beloved by Toni Morrison</li>
+        <li>Invisible Man by Ralph Ellison</li>
+        <li>Gone with the Wind by Margaret Mitchell</li>
+        <li>The Wind-Up Bird Chronicle by Haruki Murakami</li>
+        <li>Love in the Time of Cholera by Gabriel Garcia Marquez</li>
+        <li>The Kite Runner by Khaled Hosseini</li>
+        <li>Life of Pi by Yann Martel</li>
+        <li>The Road by Cormac McCarthy</li>
+        <li>The Book Thief by Markus Zusak</li>
+        <li>The Alchemist by Paulo Coelho</li>
+        <li>Memoirs of a Geisha by Arthur Golden</li>
+        <li>The Name of the Rose by Umberto Eco</li>
+        <li>The Shining by Stephen King</li>
+        <li>It by Stephen King</li>
+        <li>The Stand by Stephen King</li>
+        <li>The Girl with the Dragon Tattoo by Stieg Larsson</li>
+        <li>Water for Elephants by Sara Gruen</li>
+        <li>The Secret Life of Bees by Sue Monk Kidd</li>
+        <li>Norwegian Wood by Haruki Murakami</li>
+        <li>1Q84 by Haruki Murakami</li>
+        <li>Shogun by James Clavell</li>
+        <li>The Pillars of the Earth by Ken Follett</li>
+        <li>The Catcher in the Rye by J.D. Salinger</li>
+        <li>To Kill a Mockingbird by Harper Lee</li>
+        <li>1984 by George Orwell</li>
+        <li>The Great Gatsby by F. Scott Fitzgerald</li>
+        <li>Brave New World by Aldous Huxley</li>
+        <li>Slaughterhouse-Five by Kurt Vonnegut</li>
+        <li>Frankenstein by Mary Shelley</li>
+        <li>Dracula by Bram Stoker</li>
+        <li>The Picture of Dorian Gray by Oscar Wilde</li>
+        <li>A Tale of Two Cities by Charles Dickens</li>
+        <li>Heart of Darkness by Joseph Conrad</li>
+        <li>The Metamorphosis by Franz Kafka</li>
+        <li>The Count of Monte Cristo by Alexandre Dumas</li>
+        <li>David Copperfield by Charles Dickens</li>
+        <li>Sense and Sensibility by Jane Austen</li>
+        <li>Alice's Adventures in Wonderland by Lewis Carroll</li>
+        <li>The Old Man and the Sea by Ernest Hemingway</li>
+        <li>The Sun Also Rises by Ernest Hemingway</li>
+        <li>For Whom the Bell Tolls by Ernest Hemingway</li>
+        <li>The Sound and the Fury by William Faulkner</li>
+        <li>Beloved by Toni Morrison</li>
+        <li>Invisible Man by Ralph Ellison</li>
+        <li>Gone with the Wind by Margaret Mitchell</li>
+        <li>The Wind-Up Bird Chronicle by Haruki Murakami</li>
+        <li>Love in the Time of Cholera by Gabriel Garcia Marquez</li>
+        <li>The Kite Runner by Khaled Hosseini</li>
+        <li>Life of Pi by Yann Martel</li>
+        <li>The Road by Cormac McCarthy</li>
+        <li>The Book Thief by Markus Zusak</li>
+    </ol>
+
+    <script>
+        function searchBook() {
+            var input = document.getElementById("searchInput").value.toLowerCase().trim();
+            var items = document.querySelectorAll("#bookList li");
+            var found = false;
+
+            items.forEach(function(li) {
+                if (li.textContent.toLowerCase().includes(input)) {
+                    alert("Found: " + li.textContent);
+                    found = true;
+                }
+            });
+
+            if (!found) {
+                alert("Book not found");
+            }
+        }
+    </script>
+</body>
+</html>

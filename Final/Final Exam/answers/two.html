@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <nav>
+        <a href="one.html">Problem 1</a> |
+        <a href="two.html">Problem 2</a> |
+        <a href="three.html">Problem 3</a> |
+        <a href="four.html">Problem 4</a> |
+        <a href="five.html">Problem 5</a> |
+        <a href="six.html">Problem 6</a> |
+        <a href="seven.html">Problem 7</a> |
+        <a href="eight.html">Problem 8</a> |
+        <a href="nine.html">Problem 9</a>
+    </nav> 
+    <br><br>
+    <h1>Problem 2</h1><br>
+    <div>
+        <table border="1">
+            <tr>
+                <td>ID</td>
+                <td>Name</td>
+                <td>Mobile</td>
+                <td>Email</td>
+            </tr>
+        </table>
+    </div>
+    <script>
+        // Example using the provided API URL
+        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+        const url = 'https://codeandcareer.com/assignments/api/api.php';
+
+        fetch(proxyUrl + url)
+            .then(response => {
+                if (!response.ok) {
+                    // Handle HTTP errors
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(data); // Handle the JSON data
+
+                if (Array.isArray(data)) {
+                    const table = document.querySelector('table');
+                    const tbody = table.querySelector('tbody');
+                    
+                    data.forEach(item => {
+                        const row = document.createElement('tr');
+                        
+                        const idCell = document.createElement('td');
+                        idCell.textContent = item.id || 'N/A';
+                        row.appendChild(idCell);
+
+                        const nameCell = document.createElement('td');
+                        nameCell.textContent = item.full_name || 'N/A'; 
+                        row.appendChild(nameCell);
+
+                        const mobileCell = document.createElement('td');
+                        mobileCell.textContent = item.mobile || 'N/A';
+                        row.appendChild(mobileCell);
+
+                        const emailCell = document.createElement('td');
+                        emailCell.textContent = item.email || 'N/A';
+                        row.appendChild(emailCell);
+
+                        tbody.appendChild(row);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error: ', error); // Handle errors
+            });
+    </script>
+</body>
+</html>
