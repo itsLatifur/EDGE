@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Video as VideoIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, Video as VideoIconLucide, Loader2, Youtube } from 'lucide-react'; // Changed VideoIcon to VideoIconLucide to avoid conflict
 import type { CategoryTab, VideoItem, PlaylistData } from '@/lib/constants';
 import { addCategory as addCategoryToMemory, addVideoToPlaylist as addVideoToMemoryPlaylist, getCategories, getPlaylistData } from '@/lib/constants';
 import { AddCategoryForm } from './AddCategoryForm';
@@ -97,7 +97,7 @@ export function ManageVideosClient() {
 
       <Card className="shadow-md">
         <CardHeader>
-          <CardTitle className="text-lg md:text-xl lg:text-2xl flex items-center"><VideoIcon className="mr-2 h-5 w-5 md:h-6 md:w-6 text-primary" /> Add Video to Playlist</CardTitle>
+          <CardTitle className="text-lg md:text-xl lg:text-2xl flex items-center"><VideoIconLucide className="mr-2 h-5 w-5 md:h-6 md:w-6 text-primary" /> Add Video to Playlist</CardTitle>
           <CardDescription className="text-xs md:text-sm">Select a category and add a new video.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -191,7 +191,7 @@ export function ManageVideosClient() {
             <CardTitle className="text-lg md:text-xl lg:text-2xl">Current Video Playlists</CardTitle>
             <CardDescription className="text-xs md:text-sm">Overview of videos in each category.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 md:pt-6">
             {isCategoryLoading ? (
                  <div className="flex items-center justify-center p-6 md:p-8">
                     <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
@@ -203,15 +203,23 @@ export function ManageVideosClient() {
                 <div className="space-y-4">
                     {categories.map(category => (
                         <div key={category.id}>
-                            <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2">{category.label} ({playlists[category.id]?.videos?.length || 0} videos)</h3>
+                             <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2 flex items-center">
+                              {category.icon && <category.icon className="h-4 w-4 mr-2 text-primary/80" />}
+                              {category.label} ({playlists[category.id]?.videos?.length || 0} videos)
+                            </h3>
                             {playlists[category.id]?.videos && playlists[category.id].videos.length > 0 ? (
-                                <ul className="list-disc pl-5 space-y-1 text-xs md:text-sm text-muted-foreground">
+                                <ul className="space-y-1.5 text-xs md:text-sm text-muted-foreground pl-2">
                                     {playlists[category.id].videos.map(video => (
-                                        <li key={video.id} className="truncate" title={video.title}>{video.title} (ID: {video.id})</li>
+                                        <li key={video.id} className="flex items-start p-1.5 rounded-md hover:bg-muted/50">
+                                            <Youtube className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-500/90" />
+                                            <span className="truncate flex-grow" title={`${video.title} (ID: ${video.id})`}>
+                                                {video.title} <span className="text-muted-foreground/80">(ID: {video.id})</span>
+                                            </span>
+                                        </li>
                                     ))}
                                 </ul>
                             ) : (
-                                <p className="text-xs md:text-sm text-muted-foreground">No videos in this playlist yet.</p>
+                                <p className="text-xs md:text-sm text-muted-foreground pl-2">No videos in this playlist yet.</p>
                             )}
                         </div>
                     ))}

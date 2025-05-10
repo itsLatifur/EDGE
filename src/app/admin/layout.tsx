@@ -67,7 +67,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className="hidden md:flex">
         <AdminSidebar />
       </div>
-      <main className="flex-1 p-4 md:p-6 overflow-auto pt-16 md:pt-6">
+      <main className="flex-1 p-4 sm:p-6 overflow-auto pt-16 md:pt-6">
         {children}
       </main>
     </div>

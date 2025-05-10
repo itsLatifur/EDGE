@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, BookOpen as BookOpenIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, BookOpen as BookOpenIcon, Loader2, Link as LinkIcon } from 'lucide-react'; // Added LinkIcon
 import type { CategoryTab, ResourceLink } from '@/lib/constants';
 import { addCategory as addCategoryToMemory, addResourceLink as addResourceLinkToMemory, getCategories, getResourcesData } from '@/lib/constants';
 import { AddCategoryForm } from './AddCategoryForm';
@@ -219,7 +219,7 @@ export function ManageResourcesClient() {
             <CardTitle className="text-lg md:text-xl lg:text-2xl">Current Resources</CardTitle>
             <CardDescription className="text-xs md:text-sm">Overview of resources in each category.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 md:pt-6">
             {isCategoryLoading ? (
                 <div className="flex items-center justify-center p-6 md:p-8">
                     <Loader2 className="h-6 w-6 md:h-8 md:w-8 animate-spin text-primary" />
@@ -231,15 +231,23 @@ export function ManageResourcesClient() {
                 <div className="space-y-4">
                     {categories.map(category => (
                         <div key={category.id}>
-                            <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2">{category.label} ({resources[category.id]?.length || 0} resources)</h3>
+                            <h3 className="text-base md:text-lg font-semibold mb-1 md:mb-2 flex items-center">
+                              {category.icon && <category.icon className="h-4 w-4 mr-2 text-primary/80" />}
+                              {category.label} ({resources[category.id]?.length || 0} resources)
+                            </h3>
                             {resources[category.id] && resources[category.id].length > 0 ? (
-                                <ul className="list-disc pl-5 space-y-1 text-xs md:text-sm text-muted-foreground">
+                                <ul className="space-y-1.5 text-xs md:text-sm text-muted-foreground pl-2">
                                     {resources[category.id].map(resource => (
-                                        <li key={resource.id} className="truncate" title={resource.title}>{resource.title} ({resource.type})</li>
+                                        <li key={resource.id} className="flex items-start p-1.5 rounded-md hover:bg-muted/50">
+                                            <LinkIcon className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-primary/70" />
+                                            <span className="truncate flex-grow" title={`${resource.title} (${resource.type})`}>
+                                                {resource.title} <span className="text-muted-foreground/80">({resource.type})</span>
+                                            </span>
+                                        </li>
                                     ))}
                                 </ul>
                             ) : (
-                                <p className="text-xs md:text-sm text-muted-foreground">No resources in this category yet.</p>
+                                <p className="text-xs md:text-sm text-muted-foreground pl-2">No resources in this category yet.</p>
                             )}
                         </div>
                     ))}
